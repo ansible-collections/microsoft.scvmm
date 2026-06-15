@@ -1,0 +1,7 @@
+# Inventory Template
+# This file will be adapted by QA Coordinator based on project_context.yml
+# Connection type and credentials populated from test environment details
+
+# Placeholder - will be replaced with actual inventory
+[test_hosts]
+# <HOST> ansible_connection=<CONNECTION> ansible_user=<USER> ...
