@@ -7,11 +7,11 @@
 
 ## Modules to Build
 
-- [ ] scvmm_vm (ACA-5518)
-- [ ] scvmm_vm_info (ACA-5519)
-- [ ] scvmm_vm_state (ACA-5520)
-- [ ] scvmm_vm_checkpoint (ACA-5521)
-- [ ] scvmm_vm_migrate (ACA-5680)
-- [ ] scvmm_vm_clone (ACA-5686)
-- [ ] scvmm_vm_dvd_drive (ACA-5689)
-- [ ] scvmm_vm_scsi_adapter (ACA-5694)
+- [!] scvmm_vm (ACA-5518) - CODE COMPLETE, TESTS BLOCKED
+- [!] scvmm_vm_info (ACA-5519) - CODE COMPLETE, TESTS BLOCKED
+- [!] scvmm_vm_state (ACA-5520) - CODE COMPLETE, TESTS BLOCKED
+- [!] scvmm_vm_checkpoint (ACA-5521) - CODE COMPLETE, TESTS BLOCKED
+- [!] scvmm_vm_migrate (ACA-5680) - CODE COMPLETE, TESTS BLOCKED
+- [!] scvmm_vm_clone (ACA-5686) - CODE COMPLETE, TESTS BLOCKED
+- [!] scvmm_vm_dvd_drive (ACA-5689) - CODE COMPLETE, TESTS BLOCKED
+- [!] scvmm_vm_scsi_adapter (ACA-5694) - CODE COMPLETE, TESTS BLOCKED

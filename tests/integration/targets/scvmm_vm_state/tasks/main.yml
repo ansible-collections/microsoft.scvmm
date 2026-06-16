@@ -1,0 +1,30 @@
+---
+# Integration tests for scvmm_vm_state module
+# STATUS: BLOCKED - Test environment offline (SCVMM not installed)
+#
+# These tests require:
+# - SCVMM 2022 installed and configured
+# - VirtualMachineManager PowerShell module
+# - At least one test VM available
+#
+# Test coverage planned:
+# 1. Start VM from stopped state
+# 2. Idempotency check (start already running VM)
+# 3. Stop VM gracefully
+# 4. Stop VM forcefully
+# 5. Restart VM gracefully
+# 6. Restart VM forcefully
+# 7. Suspend VM
+# 8. Resume suspended VM
+# 9. Save VM state
+# 10. Pause VM
+# 11. Resume paused VM
+# 12. Check mode validation
+# 13. Timeout handling
+# 14. Error handling (invalid VM name)
+#
+# Blocked by: Server offline after DC promotion. SCVMM 2022 not installed.
+
+- name: Test environment validation
+  debug:
+    msg: "Integration tests blocked - SCVMM test environment not available"

@@ -1,0 +1,24 @@
+---
+# Integration tests for scvmm_vm_info module
+# STATUS: BLOCKED - Test environment unavailable
+# REASON: Server offline after DC promotion. SCVMM 2022 not installed.
+#
+# These tests will be enabled once the SCVMM test environment is available.
+#
+# Test Plan:
+# 1. Test retrieving all VMs
+# 2. Test filtering by name
+# 3. Test filtering by ID
+# 4. Test filtering by status
+# 5. Test filtering by cloud
+# 6. Test filtering by host
+# 7. Test filtering by host group
+# 8. Test combining multiple filters
+# 9. Test with non-existent VM (should return empty list)
+# 10. Test error handling with invalid server
+
+- name: Skip tests - environment blocked
+  debug:
+    msg: "Integration tests blocked - SCVMM test environment unavailable"
+  tags:
+    - always

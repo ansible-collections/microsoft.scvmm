@@ -1,0 +1,31 @@
+---
+release_summary: |
+  Initial release of microsoft.scvmm collection for System Center Virtual Machine Manager 2022.
+  Provides comprehensive VM lifecycle management including creation, power state control,
+  checkpoints, migration, cloning, and hardware management.
+
+  **Build Notes**: Generated from Jira Epic ACA-5512 in CODE-ONLY mode.
+  All 8 modules implemented and delivered. Integration tests blocked due to offline
+  test environment (SCVMM 2022 not installed on test host).
+
+minor_changes:
+  - Initial collection release for SCVMM 2022 VM management
+  - Auto-generated from Jira Epic ACA-5512 by Jarvis Framework
+
+new_modules:
+  - name: scvmm_vm
+    description: Create and manage SCVMM virtual machines with full hardware and guest OS configuration
+  - name: scvmm_vm_info
+    description: Gather detailed information about SCVMM virtual machines
+  - name: scvmm_vm_state
+    description: Manage VM power state (start, stop, restart, pause, resume)
+  - name: scvmm_vm_checkpoint
+    description: Create, restore, and remove VM checkpoints
+  - name: scvmm_vm_migrate
+    description: Migrate VMs between hosts with live migration support
+  - name: scvmm_vm_clone
+    description: Clone virtual machines from existing VMs
+  - name: scvmm_vm_dvd_drive
+    description: Manage VM DVD drives and ISO attachments
+  - name: scvmm_vm_scsi_adapter
+    description: Manage VM SCSI adapters and controller configuration
