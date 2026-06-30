@@ -52,9 +52,12 @@ delivery:
 
   # Final delivery tracking
   status: completed
-  delivery_date: 2026-06-30T10:05:00
+  delivery_date: 2026-06-30T10:10:00
   delivered_by: release-specialist
-  commit_sha: bc63a19
+  commit_sha: 4c26b43c2f2f5e6941c620f0f7ee46d2aa3e8a59
+  delivery_commit: bc63a19
+  repository_url: https://github.com/ansible-collections/microsoft.scvmm
+  push_status: success
   modules_delivered: 8
   bugs_fixed: 2
   test_pass_rate: 83.3%
