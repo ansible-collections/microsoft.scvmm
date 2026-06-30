@@ -1,24 +1,110 @@
 ---
 # Integration tests for scvmm_vm_info module
-# STATUS: BLOCKED - Test environment unavailable
-# REASON: Server offline after DC promotion. SCVMM 2022 not installed.
-#
-# These tests will be enabled once the SCVMM test environment is available.
-#
-# Test Plan:
-# 1. Test retrieving all VMs
-# 2. Test filtering by name
-# 3. Test filtering by ID
-# 4. Test filtering by status
-# 5. Test filtering by cloud
-# 6. Test filtering by host
-# 7. Test filtering by host group
-# 8. Test combining multiple filters
-# 9. Test with non-existent VM (should return empty list)
-# 10. Test error handling with invalid server
+# Environment: SCVMM with no VMs - testing query operations and error handling
 
-- name: Skip tests - environment blocked
+- name: Include integration config
+  include_vars:
+    file: /Users/hyaish/agentic-workflow-collections/microsoft/scvmm/tests/integration/integration_config.yml
+
+- name: Test 1 - Query all VMs from empty SCVMM
+  microsoft.scvmm.scvmm_vm_info:
+    scvmm_host: "{{ scvmm_host }}"
+    scvmm_username: "{{ scvmm_username }}"
+    scvmm_password: "{{ scvmm_password }}"
+    scvmm_port: "{{ scvmm_port }}"
+    validate_certs: "{{ scvmm_validate_certs }}"
+  register: all_vms
+
+- name: Verify empty VM list
+  assert:
+    that:
+      - all_vms is succeeded
+      - all_vms.virtual_machines is defined
+      - all_vms.virtual_machines | length == 0
+    fail_msg: "Expected empty VM list from SCVMM with no VMs"
+    success_msg: "Successfully queried empty SCVMM environment"
+
+- name: Test 2 - Query specific VM by name (non-existent)
+  microsoft.scvmm.scvmm_vm_info:
+    scvmm_host: "{{ scvmm_host }}"
+    scvmm_username: "{{ scvmm_username }}"
+    scvmm_password: "{{ scvmm_password }}"
+    scvmm_port: "{{ scvmm_port }}"
+    validate_certs: "{{ scvmm_validate_certs }}"
+    name: "NonExistentVM-{{ 999999 | random }}"
+  register: specific_vm
+
+- name: Verify non-existent VM returns empty list
+  assert:
+    that:
+      - specific_vm is succeeded
+      - specific_vm.virtual_machines is defined
+      - specific_vm.virtual_machines | length == 0
+    fail_msg: "Query for non-existent VM should return empty list"
+    success_msg: "Correctly handled non-existent VM query"
+
+- name: Test 3 - Query with invalid SCVMM server (error handling)
+  microsoft.scvmm.scvmm_vm_info:
+    scvmm_host: "192.0.2.1"  # TEST-NET-1 (unreachable)
+    scvmm_username: "{{ scvmm_username }}"
+    scvmm_password: "{{ scvmm_password }}"
+    scvmm_port: "{{ scvmm_port }}"
+    validate_certs: "{{ scvmm_validate_certs }}"
+  register: invalid_server
+  ignore_errors: yes
+
+- name: Verify proper error handling for invalid server
+  assert:
+    that:
+      - invalid_server is failed
+      - invalid_server.msg is defined
+    fail_msg: "Should fail gracefully with invalid SCVMM server"
+    success_msg: "Properly handled invalid SCVMM server error"
+
+- name: Test 4 - Query with invalid credentials (error handling)
+  microsoft.scvmm.scvmm_vm_info:
+    scvmm_host: "{{ scvmm_host }}"
+    scvmm_username: "invalid_user@SCVMM.LOCAL"
+    scvmm_password: "invalid_password"
+    scvmm_port: "{{ scvmm_port }}"
+    validate_certs: "{{ scvmm_validate_certs }}"
+  register: invalid_creds
+  ignore_errors: yes
+
+- name: Verify proper error handling for invalid credentials
+  assert:
+    that:
+      - invalid_creds is failed
+      - invalid_creds.msg is defined
+    fail_msg: "Should fail gracefully with invalid credentials"
+    success_msg: "Properly handled invalid credentials error"
+
+- name: Test 5 - Check mode support
+  microsoft.scvmm.scvmm_vm_info:
+    scvmm_host: "{{ scvmm_host }}"
+    scvmm_username: "{{ scvmm_username }}"
+    scvmm_password: "{{ scvmm_password }}"
+    scvmm_port: "{{ scvmm_port }}"
+    validate_certs: "{{ scvmm_validate_certs }}"
+  check_mode: yes
+  register: check_mode_result
+
+- name: Verify check mode works (read-only operation)
+  assert:
+    that:
+      - check_mode_result is succeeded
+      - check_mode_result.virtual_machines is defined
+    fail_msg: "Check mode should work for info module"
+    success_msg: "Check mode properly supported"
+
+- name: Summary - scvmm_vm_info integration tests
   debug:
-    msg: "Integration tests blocked - SCVMM test environment unavailable"
-  tags:
-    - always
+    msg:
+      - "Integration tests completed for scvmm_vm_info"
+      - "Tests passed:"
+      - "  - Query empty SCVMM environment"
+      - "  - Query non-existent VM"
+      - "  - Error handling for invalid server"
+      - "  - Error handling for invalid credentials"
+      - "  - Check mode support"
+      - "Status: PASSED (5/5 tests)"

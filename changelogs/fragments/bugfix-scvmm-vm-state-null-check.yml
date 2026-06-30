@@ -1,0 +1,3 @@
+---
+bugfixes:
+  - scvmm_vm_state - Fixed null reference error in check mode when VM does not exist by changing ErrorAction to SilentlyContinue and adding explicit null check before accessing VM properties (https://github.com/ansible-collections/microsoft.scvmm/issues/2)
