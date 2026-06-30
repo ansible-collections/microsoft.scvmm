@@ -59,7 +59,7 @@ $spec = @{
         path = @{ type = "str"; required = $false }
     }
     required_if = @(
-        @("state", "present", @("template", "cloud"), $true)
+        ,@("state", "present", @("template", "cloud"), $true)
     )
     mutually_exclusive = @(
         ,@("cloud", "vm_host")

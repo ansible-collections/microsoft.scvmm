@@ -61,9 +61,14 @@ try {
 
 # Get the VM
 try {
-    $vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $name -ErrorAction Stop
+    $vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $name -ErrorAction SilentlyContinue
 } catch {
-    $module.FailJson("Failed to find VM '$name': $($_.Exception.Message)")
+    $module.FailJson("Failed to query VM '$name': $($_.Exception.Message)")
+}
+
+# Check if VM exists
+if ($null -eq $vm) {
+    $module.FailJson("VM '$name' not found on SCVMM server '$vmm_server'.")
 }
 
 # Map VM status to Ansible state names
