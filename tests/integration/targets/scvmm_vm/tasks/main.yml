@@ -1,0 +1,28 @@
+---
+- name: Define test variables
+  set_fact:
+    test_vm: "AnsibleTest_{{ 99999 | random }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_vm
+
+    - name: Teardown - Validate VM removed
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_vm_validate
+
+    - name: Teardown - Assert server is clean
+      assert:
+        that:
+          - teardown_vm_validate.changed == false

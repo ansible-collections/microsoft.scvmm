@@ -1,0 +1,91 @@
+---
+- name: Create VM from template
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    template: "{{ test_vm_template }}"
+    vm_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_result
+
+- name: Assert VM created
+  assert:
+    that:
+      - create_result.changed == true
+      - create_result.vm.name == test_vm
+
+- name: Create VM again (idempotency)
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    template: "{{ test_vm_template }}"
+    vm_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - create_idem.changed == false
+
+- name: Update VM cpu_count
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    cpu_count: 4
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_result
+
+- name: Assert VM updated
+  assert:
+    that:
+      - update_result.changed == true
+
+- name: Get VM info
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_result
+
+- name: Assert VM info returned
+  assert:
+    that:
+      - info_result.virtual_machines | length == 1
+      - info_result.virtual_machines[0].name == test_vm
+
+- name: Check mode delete
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_delete
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_delete.changed == true
+
+- name: Delete VM
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert deleted
+  assert:
+    that:
+      - delete_result.changed == true
+
+- name: Delete again (idempotency)
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - delete_idem.changed == false

@@ -1,0 +1,3 @@
+---
+minor_changes:
+  - scvmm_vm - Manage the creation, update, and removal of Virtual Machines on SCVMM 2022.
