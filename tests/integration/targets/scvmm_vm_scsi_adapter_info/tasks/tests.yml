@@ -1,0 +1,51 @@
+---
+- name: Get all SCSI adapters on VM
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: all_adapters
+
+- name: Assert SCSI adapters returned
+  assert:
+    that:
+      - all_adapters.scsi_adapters is defined
+      - all_adapters.scsi_adapters | length == (initial_adapter_count | int) + 1
+
+- name: Assert created adapter is in the list
+  assert:
+    that:
+      - all_adapters.scsi_adapters | selectattr('id', 'equalto', created_adapter_guid) | list | length == 1
+
+- name: Verify adapter details
+  set_fact:
+    test_adapter: "{{ all_adapters.scsi_adapters | selectattr('id', 'equalto', created_adapter_guid) | first }}"
+
+- name: Assert adapter has expected fields
+  assert:
+    that:
+      - test_adapter.id == created_adapter_guid
+      - test_adapter.adapter_id is defined
+      - test_adapter.shared == false
+
+- name: Get SCSI adapters again (consistency check)
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert consistent results
+  assert:
+    that:
+      - second_query.scsi_adapters | length == all_adapters.scsi_adapters | length
+
+- name: Get SCSI adapters on non-existent VM
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: bad_vm
+  ignore_errors: true
+
+- name: Assert failure for non-existent VM
+  assert:
+    that:
+      - bad_vm.failed == true
