@@ -1,0 +1,247 @@
+---
+- name: Check mode create checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    description: "Test checkpoint description"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_create.changed == true
+
+- name: Verify check mode did not create checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_create
+
+- name: Assert checkpoint was not actually created
+  assert:
+    that:
+      - post_check_create.checkpoints | length == 0
+
+- name: Create checkpoint with description
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    description: "Test checkpoint description"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: checkpoint_create
+
+- name: Assert checkpoint created with return values
+  assert:
+    that:
+      - checkpoint_create.changed == true
+      - checkpoint_create.checkpoint.id is defined
+      - checkpoint_create.checkpoint.id | length > 0
+      - checkpoint_create.checkpoint.creation_time is defined
+      - checkpoint_create.checkpoint.description == "Test checkpoint description"
+
+- name: Verify checkpoint exists via info module
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: checkpoint_verify
+
+- name: Assert checkpoint visible in SCVMM
+  assert:
+    that:
+      - checkpoint_verify.checkpoints | length == 1
+      - checkpoint_verify.checkpoints[0].name == test_checkpoint
+      - checkpoint_verify.checkpoints[0].id == checkpoint_create.checkpoint.id
+
+- name: Create checkpoint again (idempotency)
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: checkpoint_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - checkpoint_idem.changed == false
+
+- name: Check mode create when already present (no-op)
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_create_noop
+
+- name: Assert check mode no-op reports no change
+  assert:
+    that:
+      - check_create_noop.changed == false
+
+- name: Check mode restore checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: reverted
+  check_mode: true
+  register: check_restore
+
+- name: Assert check mode restore reports changed
+  assert:
+    that:
+      - check_restore.changed == true
+      - check_restore.checkpoint.id == checkpoint_create.checkpoint.id
+
+- name: Verify checkpoint still exists after check mode restore
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_restore
+
+- name: Assert check mode restore did not consume checkpoint
+  assert:
+    that:
+      - post_check_restore.checkpoints | length == 1
+
+- name: Restore checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: reverted
+  register: restore_result
+
+- name: Assert checkpoint restored
+  assert:
+    that:
+      - restore_result.changed == true
+      - restore_result.checkpoint.id is defined
+
+- name: Verify checkpoint still exists after restore
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_restore_verify
+
+- name: Assert checkpoint still present
+  assert:
+    that:
+      - post_restore_verify.checkpoints | length == 1
+
+- name: Check mode delete checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_delete
+
+- name: Assert check mode delete reports changed
+  assert:
+    that:
+      - check_delete.changed == true
+
+- name: Verify check mode did not delete checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_delete_verify
+
+- name: Assert checkpoint still exists after check mode delete
+  assert:
+    that:
+      - post_check_delete_verify.checkpoints | length == 1
+
+- name: Delete checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: delete_result
+
+- name: Assert checkpoint deleted
+  assert:
+    that:
+      - delete_result.changed == true
+
+- name: Verify checkpoint removed via info module
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_delete_verify
+
+- name: Assert checkpoint no longer exists
+  assert:
+    that:
+      - post_delete_verify.checkpoints | length == 0
+
+- name: Delete checkpoint again (idempotency)
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: delete_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - delete_idem.changed == false
+
+- name: Check mode delete when already absent (no-op)
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_delete_noop
+
+- name: Assert check mode no-op reports no change
+  assert:
+    that:
+      - check_delete_noop.changed == false
+
+- name: Revert non-existent checkpoint
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "{{ test_vm }}"
+    name: "NonExistentCheckpoint_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: reverted
+  register: revert_missing
+  ignore_errors: true
+
+- name: Assert revert of missing checkpoint fails
+  assert:
+    that:
+      - revert_missing is failed
+      - "'not found' in revert_missing.msg"
+
+- name: Manage checkpoint on non-existent VM
+  microsoft.scvmm.scvmm_vm_checkpoint:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    name: "TestCheckpoint"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: missing_vm
+  ignore_errors: true
+
+- name: Assert missing VM fails
+  assert:
+    that:
+      - missing_vm is failed
+      - "'not found' in missing_vm.msg"
