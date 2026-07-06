@@ -1,0 +1,8 @@
+*.tar.gz
+__pycache__/
+*.pyc
+.tox/
+*.egg-info/
+.pytest_cache/
+tests/output/
+docs/plans/

@@ -1,0 +1,20 @@
+namespace: microsoft
+name: scvmm
+version: 1.0.0
+readme: README.md
+authors:
+  - Red Hat Ansible Content Team
+description: >
+  Ansible collection for System Center Virtual Machine Manager (SCVMM) 2022.
+  Certified for Red Hat Automation Hub.
+license:
+  - GPL-3.0-or-later
+tags:
+  - microsoft
+  - scvmm
+  - virtualization
+  - windows
+  - hyperv
+dependencies:
+  ansible.windows: ">=2.0.0"
+repository: https://github.com/ansible-collections/microsoft.scvmm

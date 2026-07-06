@@ -1,0 +1,22 @@
+## SCVMM Member Server - VERIFIED WORKING 2026-06-29
+[windows]
+#SCVMM Member Server (10.46.109.1)
+scvmm_server ansible_host=10.46.109.1
+
+#Domain Controller (10.46.109.224)
+#hyperv_test_host ansible_host=10.46.109.224
+
+[windows:vars]
+ansible_user=administrator@SCVMM.LOCAL
+ansible_password=Aa123456
+ansible_connection=winrm
+ansible_winrm_transport=ntlm
+ansible_winrm_server_cert_validation=ignore
+ansible_winrm_scheme=http
+ansible_port=5985
+
+[winrm:children]
+windows
+
+[testhost:children]
+windows
