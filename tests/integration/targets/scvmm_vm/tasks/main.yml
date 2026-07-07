@@ -13,7 +13,7 @@
         name: "{{ test_vm }}"
         state: absent
         vmm_server: "{{ scvmm_server }}"
-      register: teardown_vm
+      ignore_errors: true
 
     - name: Teardown - Validate VM removed
       microsoft.scvmm.scvmm_vm:
