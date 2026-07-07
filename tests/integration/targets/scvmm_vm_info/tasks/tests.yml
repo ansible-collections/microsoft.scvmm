@@ -1,0 +1,80 @@
+---
+- name: Get all VMs info
+  microsoft.scvmm.scvmm_vm_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_vms
+
+- name: Assert all VMs returned and module reports no change
+  assert:
+    that:
+      - all_vms is not changed
+      - all_vms.virtual_machines is defined
+      - all_vms.virtual_machines | length > 0
+
+- name: Get specific VM info by name
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: specific_vm
+
+- name: Assert specific VM returned with all documented fields
+  assert:
+    that:
+      - specific_vm is not changed
+      - specific_vm.virtual_machines | length == 1
+      - specific_vm.virtual_machines[0].name == test_vm
+      - specific_vm.virtual_machines[0].id is defined
+      - specific_vm.virtual_machines[0].id | length > 0
+      - specific_vm.virtual_machines[0].status is defined
+      - specific_vm.virtual_machines[0].host is defined
+      - specific_vm.virtual_machines[0].cpu_count is defined
+      - specific_vm.virtual_machines[0].cpu_count > 0
+      - specific_vm.virtual_machines[0].memory_mb is defined
+      - specific_vm.virtual_machines[0].memory_mb > 0
+      - specific_vm.virtual_machines[0].generation is defined
+      - specific_vm.virtual_machines[0].generation in [1, 2]
+
+- name: Get info for non-existent VM
+  microsoft.scvmm.scvmm_vm_info:
+    name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_vm
+
+- name: Assert no VM returned for non-existent
+  assert:
+    that:
+      - missing_vm is not changed
+      - missing_vm.virtual_machines | length == 0
+
+- name: Get VM info in check mode
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode returns same data and no change
+  assert:
+    that:
+      - check_mode_result is not changed
+      - check_mode_result.virtual_machines | length == 1
+      - check_mode_result.virtual_machines[0].name == test_vm
+
+- name: Get VM info again (idempotency - full payload comparison)
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert full payload is stable across repeated queries
+  assert:
+    that:
+      - second_query is not changed
+      - second_query.virtual_machines | length == 1
+      - second_query.virtual_machines[0].name == specific_vm.virtual_machines[0].name
+      - second_query.virtual_machines[0].id == specific_vm.virtual_machines[0].id
+      - second_query.virtual_machines[0].status == specific_vm.virtual_machines[0].status
+      - second_query.virtual_machines[0].host == specific_vm.virtual_machines[0].host
+      - second_query.virtual_machines[0].cpu_count == specific_vm.virtual_machines[0].cpu_count
+      - second_query.virtual_machines[0].memory_mb == specific_vm.virtual_machines[0].memory_mb
+      - second_query.virtual_machines[0].generation == specific_vm.virtual_machines[0].generation
