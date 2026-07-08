@@ -1,0 +1,204 @@
+---
+- name: Start VM
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+  register: start_result
+
+- name: Assert VM started
+  assert:
+    that:
+      - start_result.changed == true
+      - start_result.state == "Running"
+      - start_result.previous_state is defined
+
+- name: Start VM again (idempotency)
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+  register: start_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - start_idem.changed == false
+      - start_idem.state == "Running"
+
+- name: Check mode start when already started (no-op)
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_noop
+
+- name: Assert check mode no-op reports no change
+  assert:
+    that:
+      - check_noop.changed == false
+      - check_noop.state == "Running"
+
+- name: Check mode stop VM
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_stop
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_stop.changed == true
+      - check_stop.state == "PowerOff"
+      - check_stop.previous_state == "Running"
+
+- name: Verify VM still running after check mode
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+  register: still_running
+
+- name: Assert VM unchanged by check mode
+  assert:
+    that:
+      - still_running.changed == false
+      - still_running.state == "Running"
+
+- name: Stop VM
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+  register: stop_result
+
+- name: Assert VM stopped
+  assert:
+    that:
+      - stop_result.changed == true
+      - stop_result.state == "PowerOff"
+      - stop_result.previous_state == "Running"
+
+- name: Stop VM again (idempotency)
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+  register: stop_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - stop_idem.changed == false
+      - stop_idem.state == "PowerOff"
+
+- name: Start VM for suspend test
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Suspend VM
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: suspended
+    vmm_server: "{{ scvmm_server }}"
+  register: suspend_result
+
+- name: Assert VM suspended
+  assert:
+    that:
+      - suspend_result.changed == true
+      - suspend_result.state == "Paused"
+      - suspend_result.previous_state == "Running"
+
+- name: Suspend VM again (idempotency)
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: suspended
+    vmm_server: "{{ scvmm_server }}"
+  register: suspend_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - suspend_idem.changed == false
+      - suspend_idem.state == "Paused"
+
+- name: Resume VM from suspended state
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+  register: resume_result
+
+- name: Assert VM resumed from suspended
+  assert:
+    that:
+      - resume_result.changed == true
+      - resume_result.state == "Running"
+      - resume_result.previous_state == "Paused"
+
+- name: Save VM state
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: saved
+    vmm_server: "{{ scvmm_server }}"
+  register: save_result
+
+- name: Assert VM saved
+  assert:
+    that:
+      - save_result.changed == true
+      - save_result.state == "Saved"
+      - save_result.previous_state == "Running"
+
+- name: Save VM again (idempotency)
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: saved
+    vmm_server: "{{ scvmm_server }}"
+  register: save_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - save_idem.changed == false
+      - save_idem.state == "Saved"
+
+- name: Resume VM from saved state
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+  register: resume_saved
+
+- name: Assert VM resumed from saved
+  assert:
+    that:
+      - resume_saved.changed == true
+      - resume_saved.state == "Running"
+      - resume_saved.previous_state == "Saved"
+
+- name: Stop VM for final cleanup
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Change state of non-existent VM
+  microsoft.scvmm.scvmm_vm_state:
+    name: "NonExistentVM_{{ 99999 | random }}"
+    state: started
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_vm
+  ignore_errors: true
+
+- name: Assert missing VM fails
+  assert:
+    that:
+      - missing_vm is failed
+      - "'not found' in missing_vm.msg"

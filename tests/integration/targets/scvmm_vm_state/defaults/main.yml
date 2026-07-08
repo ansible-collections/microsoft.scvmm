@@ -1,0 +1,16 @@
+---
+scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_vm_host: WIN-5UL8TNLBCNF.scvmm.local
+test_migrate_host: WIN-LOTKV8386GO.scvmm.local
+test_vm_template: BlankVM-Gen2
+test_vm_cloud: Dev-Cloud
+test_vm_host_group: All Hosts
+test_host_group_custom: Production
+test_vm_network: VM-Network
+test_logical_network: Management
+test_hardware_profile: Standard-2CPU-4GB
+test_guest_os_profile: WinServer-DomainJoin
+test_storage_classification: Standard
+test_vm_name: test-ansible-vm
+test_vm_memory_mb: 2048
+test_vm_cpu_count: 2
