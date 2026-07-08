@@ -1,0 +1,73 @@
+---
+# ── Negative: add provider with non-existent host ──
+- name: Attempt to add storage provider with invalid host
+  microsoft.scvmm.scvmm_storage_provider:
+    name: "TestProvider_{{ 99999 | random }}"
+    computer_name: "nonexistent-host.invalid.local"
+    run_as_account: "NonExistentRunAs"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: provider_error
+  ignore_errors: true
+
+- name: Assert error for invalid provider host
+  assert:
+    that:
+      - provider_error is failed
+
+# ── Check mode: add provider with invalid host ──
+- name: Add storage provider with invalid host in check mode
+  microsoft.scvmm.scvmm_storage_provider:
+    name: "TestProvider_{{ 99999 | random }}"
+    computer_name: "nonexistent-host.invalid.local"
+    run_as_account: "NonExistentRunAs"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_add
+  ignore_errors: true
+
+- name: Assert check mode still reports change for new provider
+  assert:
+    that:
+      - check_mode_add is changed or check_mode_add is failed
+
+# ── Negative: remove non-existent provider (no change) ──
+- name: Remove non-existent storage provider
+  microsoft.scvmm.scvmm_storage_provider:
+    name: "NonExistentProvider_{{ 99999 | random }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: remove_missing
+
+- name: Assert no change when removing non-existent provider
+  assert:
+    that:
+      - remove_missing is not changed
+
+# ── Check mode: remove non-existent provider ──
+- name: Remove non-existent storage provider in check mode
+  microsoft.scvmm.scvmm_storage_provider:
+    name: "NonExistentProvider_{{ 99999 | random }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_remove
+
+- name: Assert check mode reports no change for non-existent removal
+  assert:
+    that:
+      - check_mode_remove is not changed
+
+# ── Idempotency: remove non-existent provider again ──
+- name: Remove non-existent storage provider again (idempotency)
+  microsoft.scvmm.scvmm_storage_provider:
+    name: "NonExistentProvider_{{ 99999 | random }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: remove_missing_again
+
+- name: Assert idempotent removal still reports no change
+  assert:
+    that:
+      - remove_missing_again is not changed

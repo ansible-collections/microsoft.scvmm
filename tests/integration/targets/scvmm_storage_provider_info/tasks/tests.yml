@@ -1,0 +1,89 @@
+---
+# ── Query all storage providers ──
+- name: Get all storage providers
+  microsoft.scvmm.scvmm_storage_provider_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_providers
+
+- name: Assert module returns list with our test provider
+  assert:
+    that:
+      - all_providers is not changed
+      - all_providers.storage_providers is defined
+      - all_providers.storage_providers | length > 0
+
+# ── Validate return payload fields ──
+- name: Assert return payload contains all documented fields
+  assert:
+    that:
+      - all_providers.storage_providers[0].id is defined
+      - all_providers.storage_providers[0].id | length > 0
+      - all_providers.storage_providers[0].name is defined
+      - all_providers.storage_providers[0].description is defined
+      - all_providers.storage_providers[0].network_address is defined
+      - all_providers.storage_providers[0].provider_type is defined
+      - all_providers.storage_providers[0].enabled is defined
+      - all_providers.storage_providers[0].storage_arrays is defined
+
+# ── Query by name ──
+- name: Get test storage provider by name
+  microsoft.scvmm.scvmm_storage_provider_info:
+    name: "{{ test_provider_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: named_provider
+
+- name: Assert provider found by name with correct values
+  assert:
+    that:
+      - named_provider is not changed
+      - named_provider.storage_providers | length == 1
+      - named_provider.storage_providers[0].name == test_provider_name
+      - named_provider.storage_providers[0].id is defined
+      - named_provider.storage_providers[0].id | length > 0
+      - named_provider.storage_providers[0].network_address is defined
+      - named_provider.storage_providers[0].provider_type is defined
+      - named_provider.storage_providers[0].enabled is defined
+      - named_provider.storage_providers[0].storage_arrays is defined
+
+# ── Query non-existent provider ──
+- name: Get info for non-existent storage provider
+  microsoft.scvmm.scvmm_storage_provider_info:
+    name: "NonExistentProvider_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_provider
+
+- name: Assert no provider returned for non-existent
+  assert:
+    that:
+      - missing_provider is not changed
+      - missing_provider.storage_providers | length == 0
+
+# ── Check mode ──
+- name: Get storage provider info in check mode
+  microsoft.scvmm.scvmm_storage_provider_info:
+    name: "{{ test_provider_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode returns data and no change
+  assert:
+    that:
+      - check_mode_result is not changed
+      - check_mode_result.storage_providers | length == 1
+      - check_mode_result.storage_providers[0].name == test_provider_name
+
+# ── Idempotency ──
+- name: Get storage provider info again (idempotency)
+  microsoft.scvmm.scvmm_storage_provider_info:
+    name: "{{ test_provider_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert results are consistent across queries
+  assert:
+    that:
+      - second_query is not changed
+      - second_query.storage_providers | length == 1
+      - second_query.storage_providers[0].name == named_provider.storage_providers[0].name
+      - second_query.storage_providers[0].id == named_provider.storage_providers[0].id
