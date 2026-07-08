@@ -1,0 +1,136 @@
+---
+# ── Create classification ──
+- name: Create storage classification
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    description: "Ansible test classification"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert classification was created with correct values
+  assert:
+    that:
+      - create_result is changed
+      - create_result.storage_classification.name == test_classification_name
+      - create_result.storage_classification.description == "Ansible test classification"
+      - create_result.storage_classification.id is defined
+      - create_result.storage_classification.id | length > 0
+      - create_result.storage_classification.enabled is defined
+      - create_result.storage_classification.storage_pools is defined
+
+# ── Idempotency: create same classification again ──
+- name: Create same classification again (idempotency)
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    description: "Ansible test classification"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update classification description
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert classification was updated
+  assert:
+    that:
+      - update_result is changed
+      - update_result.storage_classification.description == "Updated test description"
+
+# ── Idempotency: same description again ──
+- name: Update with same description (idempotency)
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_idempotent
+
+- name: Assert no change on idempotent update
+  assert:
+    that:
+      - update_idempotent is not changed
+
+# ── Check mode: update ──
+- name: Update classification in check mode
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description unchanged after check mode
+  microsoft.scvmm.scvmm_storage_classification_info:
+    name: "{{ test_classification_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert description still has previous value
+  assert:
+    that:
+      - after_check.storage_classifications[0].description == "Updated test description"
+
+# ── Check mode: create non-existent ──
+- name: Create new classification in check mode
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "NonExistent_{{ 99999 | random }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_create
+
+- name: Assert check mode reports change for new classification
+  assert:
+    that:
+      - check_mode_create is changed
+
+# ── Delete classification ──
+- name: Remove classification
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert classification was removed
+  assert:
+    that:
+      - delete_result is changed
+
+# ── Idempotency: remove already-deleted ──
+- name: Remove classification again (idempotency)
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  assert:
+    that:
+      - delete_idempotent is not changed
+
+# ── Re-create for teardown validation ──
+- name: Re-create classification for teardown
+  microsoft.scvmm.scvmm_storage_classification:
+    name: "{{ test_classification_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"

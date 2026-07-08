@@ -1,0 +1,35 @@
+---
+- name: Define test variables
+  set_fact:
+    test_classification_name: "AnsibleTest_ClassInfo_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Create test storage classification
+      microsoft.scvmm.scvmm_storage_classification:
+        name: "{{ test_classification_name }}"
+        description: "Ansible info test classification"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test classification
+      microsoft.scvmm.scvmm_storage_classification:
+        name: "{{ test_classification_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate classification removed
+      microsoft.scvmm.scvmm_storage_classification:
+        name: "{{ test_classification_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      assert:
+        that:
+          - teardown_validate.changed == false
