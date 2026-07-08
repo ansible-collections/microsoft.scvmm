@@ -1,0 +1,60 @@
+---
+- name: Define test variables
+  set_fact:
+    test_info_template_vm: "AnsibleTest_InfoTemplateVM_{{ 99999 | random }}"
+    test_info_template: "AnsibleTest_InfoTemplate_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Create source VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_info_template_vm }}"
+        template: "{{ test_vm_template }}"
+        vm_host: "{{ test_vm_host }}"
+        vmm_server: "{{ scvmm_server }}"
+        state: present
+
+    - name: Setup - Create template from VM
+      microsoft.scvmm.scvmm_template:
+        name: "{{ test_info_template }}"
+        source_vm: "{{ test_info_template_vm }}"
+        description: "Info module test template"
+        vmm_server: "{{ scvmm_server }}"
+        state: present
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test template
+      microsoft.scvmm.scvmm_template:
+        name: "{{ test_info_template }}"
+        vmm_server: "{{ scvmm_server }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Teardown - Remove source VM (may already be destroyed)
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_info_template_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate template removed
+      microsoft.scvmm.scvmm_template:
+        name: "{{ test_info_template }}"
+        vmm_server: "{{ scvmm_server }}"
+        state: absent
+      register: teardown_template_validate
+
+    - name: Teardown - Validate source VM removed
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_info_template_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_vm_validate
+
+    - name: Teardown - Assert server is clean
+      assert:
+        that:
+          - teardown_template_validate.changed == false
+          - teardown_vm_validate.changed == false

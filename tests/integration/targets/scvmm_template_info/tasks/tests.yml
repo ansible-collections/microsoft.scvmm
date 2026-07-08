@@ -1,0 +1,92 @@
+---
+# ── Query all templates ──
+- name: Get all templates info
+  microsoft.scvmm.scvmm_template_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_templates
+
+- name: Assert all templates returned and module reports no change
+  assert:
+    that:
+      - all_templates is not changed
+      - all_templates.templates is defined
+      - all_templates.templates | length > 0
+      - all_templates.templates | selectattr('name', 'equalto', test_info_template) | list | length == 1
+
+# ── Query by name ──
+- name: Get specific template info by name
+  microsoft.scvmm.scvmm_template_info:
+    name: "{{ test_info_template }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: specific_template
+
+- name: Assert specific template returned with all documented fields
+  assert:
+    that:
+      - specific_template is not changed
+      - specific_template.templates | length == 1
+      - specific_template.templates[0].name == test_info_template
+      - specific_template.templates[0].id is defined
+      - specific_template.templates[0].id | length > 0
+      - specific_template.templates[0].description == "Info module test template"
+      - specific_template.templates[0].owner is defined
+      - specific_template.templates[0].cpu_count is defined
+      - specific_template.templates[0].cpu_count > 0
+      - specific_template.templates[0].memory_mb is defined
+      - specific_template.templates[0].memory_mb > 0
+      - specific_template.templates[0].generation is defined
+      - specific_template.templates[0].generation in [1, 2]
+      - specific_template.templates[0].dynamic_memory is defined
+      - specific_template.templates[0].status is defined
+      - specific_template.templates[0].creation_time is defined
+      - specific_template.templates[0].enabled is defined
+      - specific_template.templates[0].enabled == true
+
+# ── Query non-existent template ──
+- name: Get info for non-existent template
+  microsoft.scvmm.scvmm_template_info:
+    name: "NonExistentTemplate_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_template
+
+- name: Assert no template returned for non-existent
+  assert:
+    that:
+      - missing_template is not changed
+      - missing_template.templates | length == 0
+
+# ── Check mode ──
+- name: Get template info in check mode
+  microsoft.scvmm.scvmm_template_info:
+    name: "{{ test_info_template }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode returns same data and no change
+  assert:
+    that:
+      - check_mode_result is not changed
+      - check_mode_result.templates | length == 1
+      - check_mode_result.templates[0].name == test_info_template
+
+# ── Idempotency - full payload comparison ──
+- name: Get template info again (idempotency - full payload comparison)
+  microsoft.scvmm.scvmm_template_info:
+    name: "{{ test_info_template }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert full payload is stable across repeated queries
+  assert:
+    that:
+      - second_query is not changed
+      - second_query.templates | length == 1
+      - second_query.templates[0].name == specific_template.templates[0].name
+      - second_query.templates[0].id == specific_template.templates[0].id
+      - second_query.templates[0].description == specific_template.templates[0].description
+      - second_query.templates[0].cpu_count == specific_template.templates[0].cpu_count
+      - second_query.templates[0].memory_mb == specific_template.templates[0].memory_mb
+      - second_query.templates[0].generation == specific_template.templates[0].generation
+      - second_query.templates[0].status == specific_template.templates[0].status
+      - second_query.templates[0].creation_time == specific_template.templates[0].creation_time

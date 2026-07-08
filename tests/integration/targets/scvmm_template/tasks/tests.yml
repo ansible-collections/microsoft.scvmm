@@ -1,0 +1,229 @@
+---
+# ── Check-mode present (template does not exist yet) ──
+- name: Check-mode - Create template from VM
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    source_vm: "{{ test_template_vm }}"
+    description: "Integration test template"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: template_check
+
+- name: Assert check-mode reports changed
+  assert:
+    that:
+      - template_check is changed
+
+- name: Verify check-mode did not create template
+  microsoft.scvmm.scvmm_template_info:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: template_check_info
+
+- name: Assert template does not exist after check-mode
+  assert:
+    that:
+      - template_check_info.templates | length == 0
+
+- name: Verify source VM still exists after check-mode
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_template_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: vm_check_info
+
+- name: Assert source VM not destroyed by check-mode
+  assert:
+    that:
+      - vm_check_info.virtual_machines | length == 1
+
+# ── Create template from VM ──
+- name: Create template from VM
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    source_vm: "{{ test_template_vm }}"
+    description: "Integration test template"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: template_result
+
+- name: Assert template created with return values
+  assert:
+    that:
+      - template_result is changed
+      - template_result.template.id is defined
+      - template_result.template.id | length > 0
+      - template_result.template.name == test_template_name
+      - template_result.template.description == "Integration test template"
+      - template_result.template.cpu_count is defined
+      - template_result.template.cpu_count > 0
+      - template_result.template.memory_mb is defined
+      - template_result.template.memory_mb > 0
+      - template_result.template.generation is defined
+      - template_result.template.generation in [1, 2]
+      - template_result.template.dynamic_memory is defined
+      - template_result.template.status is defined
+
+# ── Verify via info module ──
+- name: Verify template exists via info
+  microsoft.scvmm.scvmm_template_info:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: template_info
+
+- name: Assert template info matches creation result
+  assert:
+    that:
+      - template_info.templates | length == 1
+      - template_info.templates[0].name == test_template_name
+      - template_info.templates[0].id == template_result.template.id
+      - template_info.templates[0].description == "Integration test template"
+
+# ── Idempotency ──
+- name: Create template again (idempotency)
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: template_idem
+
+- name: Assert idempotent with return values
+  assert:
+    that:
+      - template_idem is not changed
+      - template_idem.template.id == template_result.template.id
+      - template_idem.template.name == test_template_name
+
+# ── Check-mode present no-op (template already exists) ──
+- name: Check-mode - Template already exists
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: template_check_noop
+
+- name: Assert check-mode no-op
+  assert:
+    that:
+      - template_check_noop is not changed
+
+# ── Update template description ──
+- name: Update template description
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    description: "Updated description"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: template_update
+
+- name: Assert template updated
+  assert:
+    that:
+      - template_update is changed
+      - template_update.template.id == template_result.template.id
+      - template_update.template.description == "Updated description"
+
+- name: Update template description again (idempotency)
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    description: "Updated description"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: template_update_idem
+
+- name: Assert update is idempotent
+  assert:
+    that:
+      - template_update_idem is not changed
+
+# ── Check-mode absent (template exists) ──
+- name: Check-mode - Delete template
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: delete_check
+
+- name: Assert check-mode absent reports changed
+  assert:
+    that:
+      - delete_check is changed
+
+- name: Verify template still exists after check-mode absent
+  microsoft.scvmm.scvmm_template_info:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_delete_info
+
+- name: Assert template unchanged after check-mode absent
+  assert:
+    that:
+      - after_check_delete_info.templates | length == 1
+
+# ── Delete template ──
+- name: Delete template
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: delete_template
+
+- name: Assert template deleted
+  assert:
+    that:
+      - delete_template is changed
+
+- name: Verify template removed via info
+  microsoft.scvmm.scvmm_template_info:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_delete_info
+
+- name: Assert template no longer exists
+  assert:
+    that:
+      - after_delete_info.templates | length == 0
+
+# ── Delete idempotency ──
+- name: Delete template again (idempotency)
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: delete_idem
+
+- name: Assert delete is idempotent
+  assert:
+    that:
+      - delete_idem is not changed
+
+# ── Check-mode absent no-op (already gone) ──
+- name: Check-mode - Delete already absent template
+  microsoft.scvmm.scvmm_template:
+    name: "{{ test_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: delete_check_noop
+
+- name: Assert check-mode absent no-op
+  assert:
+    that:
+      - delete_check_noop is not changed
+
+# ── Negative: create from non-existent source VM ──
+- name: Create template from non-existent VM
+  microsoft.scvmm.scvmm_template:
+    name: "ShouldFail_{{ 99999 | random }}"
+    source_vm: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: template_error
+  ignore_errors: true
+
+- name: Assert error for non-existent source VM
+  assert:
+    that:
+      - template_error is failed
