@@ -1,0 +1,63 @@
+---
+- name: Migrate VM to same host (idempotency - already there)
+  microsoft.scvmm.scvmm_vm_migrate:
+    name: "{{ test_vm }}"
+    destination_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: migrate_same
+
+- name: Assert no change when already on destination
+  assert:
+    that:
+      - migrate_same.changed == false
+
+- name: Check mode migrate to same host
+  microsoft.scvmm.scvmm_vm_migrate:
+    name: "{{ test_vm }}"
+    destination_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: migrate_check_same
+
+- name: Assert check mode no change when already on destination
+  assert:
+    that:
+      - migrate_check_same.changed == false
+
+- name: Verify VM info after idempotent migrate
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: vm_info
+
+- name: Assert VM is on expected host
+  assert:
+    that:
+      - vm_info.virtual_machines | length == 1
+      - vm_info.virtual_machines[0].host == test_vm_host
+
+- name: Test error handling - migrate non-existent VM
+  microsoft.scvmm.scvmm_vm_migrate:
+    name: "NonExistentVM"
+    destination_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: migrate_novm
+  ignore_errors: true
+
+- name: Assert error for non-existent VM
+  assert:
+    that:
+      - migrate_novm.failed == true
+
+- name: Test error handling - migrate to non-existent host
+  microsoft.scvmm.scvmm_vm_migrate:
+    name: "{{ test_vm }}"
+    destination_host: "NonExistentHost"
+    vmm_server: "{{ scvmm_server }}"
+  register: migrate_nohost
+  ignore_errors: true
+
+- name: Assert error for non-existent host
+  assert:
+    that:
+      - migrate_nohost.failed == true
