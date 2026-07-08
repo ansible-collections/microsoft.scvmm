@@ -1,0 +1,9 @@
+---
+profile: production
+strict: true
+
+exclude_paths:
+  - changelogs/
+  - CHANGELOG.rst
+  - tests/
+  - scripts/
