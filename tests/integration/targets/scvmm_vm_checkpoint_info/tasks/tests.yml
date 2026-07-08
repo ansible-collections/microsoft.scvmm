@@ -1,0 +1,70 @@
+---
+- name: Get all checkpoints on VM
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: all_checkpoints
+
+- name: Assert checkpoints returned
+  assert:
+    that:
+      - all_checkpoints.checkpoints is defined
+      - all_checkpoints.checkpoints | length > 0
+
+- name: Assert created checkpoint is in the list
+  assert:
+    that:
+      - all_checkpoints.checkpoints | selectattr('name', 'equalto', test_checkpoint) | list | length == 1
+
+- name: Get specific checkpoint by name
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: specific_checkpoint
+
+- name: Assert specific checkpoint returned
+  assert:
+    that:
+      - specific_checkpoint.checkpoints | length == 1
+      - specific_checkpoint.checkpoints[0].name == test_checkpoint
+      - specific_checkpoint.checkpoints[0].id is defined
+      - specific_checkpoint.checkpoints[0].creation_time is defined
+
+- name: Get non-existent checkpoint by name
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "NonExistentCheckpoint_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_checkpoint
+
+- name: Assert empty list for non-existent checkpoint
+  assert:
+    that:
+      - missing_checkpoint.checkpoints | length == 0
+
+- name: Get checkpoints again (consistency check)
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "{{ test_vm }}"
+    name: "{{ test_checkpoint }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert consistent results
+  assert:
+    that:
+      - second_query.checkpoints | length == 1
+      - second_query.checkpoints[0].name == specific_checkpoint.checkpoints[0].name
+      - second_query.checkpoints[0].id == specific_checkpoint.checkpoints[0].id
+
+- name: Get checkpoints on non-existent VM
+  microsoft.scvmm.scvmm_vm_checkpoint_info:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: bad_vm
+  ignore_errors: true
+
+- name: Assert failure for non-existent VM
+  assert:
+    that:
+      - bad_vm.failed == true
