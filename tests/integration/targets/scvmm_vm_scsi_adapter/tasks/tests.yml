@@ -1,0 +1,210 @@
+---
+# Gen2 VMs assign adapter_id=255 to all SCSI adapters.
+# Use the GUID (scsi_adapter_id) to target specific adapters.
+
+- name: Get initial adapters
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: initial_adapters
+
+- name: Record initial adapter count
+  set_fact:
+    initial_count: "{{ initial_adapters.scsi_adapters | length }}"
+
+# --- Create adapter ---
+- name: Create SCSI adapter
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: add_scsi
+
+- name: Assert SCSI adapter added
+  assert:
+    that:
+      - add_scsi.changed == true
+      - add_scsi.scsi_adapter is defined
+      - add_scsi.scsi_adapter.id is defined
+      - add_scsi.scsi_adapter.shared == false
+
+- name: Capture created adapter GUID
+  set_fact:
+    created_adapter_guid: "{{ add_scsi.scsi_adapter.id }}"
+
+- name: Verify adapter exists via info module
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: scsi_verify
+
+- name: Assert new adapter visible in SCVMM
+  assert:
+    that:
+      - scsi_verify.scsi_adapters | length == (initial_count | int) + 1
+      - scsi_verify.scsi_adapters | selectattr('id', 'equalto', created_adapter_guid) | list | length == 1
+
+# --- Create idempotency (by GUID) ---
+- name: Manage adapter by GUID (idempotency)
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    scsi_adapter_id: "{{ created_adapter_guid }}"
+    state: present
+  register: add_scsi_idem
+
+- name: Assert idempotent
+  assert:
+    that:
+      - add_scsi_idem.changed == false
+      - add_scsi_idem.scsi_adapter.id == created_adapter_guid
+
+# --- Check mode no-op (already present) ---
+- name: Check mode - manage existing adapter by GUID (no-op)
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    scsi_adapter_id: "{{ created_adapter_guid }}"
+    state: present
+  check_mode: true
+  register: check_noop
+
+- name: Assert check mode no-op reports no change
+  assert:
+    that:
+      - check_noop.changed == false
+      - check_noop.scsi_adapter.id == created_adapter_guid
+
+# --- Check mode create ---
+- name: Check mode - create another SCSI adapter
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_create.changed == true
+
+- name: Verify check mode did not create adapter
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: check_create_verify
+
+- name: Assert adapter count unchanged after check mode
+  assert:
+    that:
+      - check_create_verify.scsi_adapters | length == (initial_count | int) + 1
+
+# --- Check mode remove ---
+- name: Check mode - remove SCSI adapter
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    scsi_adapter_id: "{{ created_adapter_guid }}"
+    state: absent
+  check_mode: true
+  register: check_remove
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_remove.changed == true
+
+- name: Verify check mode did not remove adapter
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: check_remove_verify
+
+- name: Assert adapter still exists after check mode
+  assert:
+    that:
+      - check_remove_verify.scsi_adapters | selectattr('id', 'equalto', created_adapter_guid) | list | length == 1
+
+# --- Remove adapter ---
+- name: Remove SCSI adapter by GUID
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    scsi_adapter_id: "{{ created_adapter_guid }}"
+    state: absent
+  register: remove_scsi
+
+- name: Assert SCSI adapter removed
+  assert:
+    that:
+      - remove_scsi.changed == true
+
+- name: Verify adapter removed via info module
+  microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_remove_verify
+
+- name: Assert adapter no longer exists in SCVMM
+  assert:
+    that:
+      - post_remove_verify.scsi_adapters | selectattr('id', 'equalto', created_adapter_guid) | list | length == 0
+      - post_remove_verify.scsi_adapters | length == (initial_count | int)
+
+# --- Remove idempotency ---
+- name: Remove SCSI adapter again (idempotency)
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    scsi_adapter_id: "{{ created_adapter_guid }}"
+    state: absent
+  register: remove_scsi_idem
+
+- name: Assert remove idempotent
+  assert:
+    that:
+      - remove_scsi_idem.changed == false
+
+# --- Check mode no-op (already absent) ---
+- name: Check mode - remove already-absent adapter (no-op)
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    scsi_adapter_id: "{{ created_adapter_guid }}"
+    state: absent
+  check_mode: true
+  register: check_remove_noop
+
+- name: Assert check mode no-op reports no change
+  assert:
+    that:
+      - check_remove_noop.changed == false
+
+# --- Error handling ---
+- name: Test error - add SCSI to non-existent VM
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+    adapter_id: 0
+    state: present
+  register: scsi_error
+  ignore_errors: true
+
+- name: Assert error was raised
+  assert:
+    that:
+      - scsi_error.failed == true
+
+- name: Test error - remove without identifier
+  microsoft.scvmm.scvmm_vm_scsi_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_no_id_error
+  ignore_errors: true
+
+- name: Assert error for missing identifier on absent
+  assert:
+    that:
+      - remove_no_id_error.failed == true
