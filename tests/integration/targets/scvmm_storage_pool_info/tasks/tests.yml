@@ -1,0 +1,62 @@
+---
+# ── Query all storage pools ──
+- name: Get all storage pools
+  microsoft.scvmm.scvmm_storage_pool_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_pools
+
+- name: Assert module returns list and reports no change
+  assert:
+    that:
+      - all_pools is not changed
+      - all_pools.storage_pools is defined
+
+- name: Validate return payload fields when pools exist
+  assert:
+    that:
+      - all_pools.storage_pools[0].id is defined
+      - all_pools.storage_pools[0].name is defined
+      - all_pools.storage_pools[0].description is defined
+      - all_pools.storage_pools[0].classification is defined
+      - all_pools.storage_pools[0].total_capacity_gb is defined
+      - all_pools.storage_pools[0].free_capacity_gb is defined
+      - all_pools.storage_pools[0].enabled is defined
+  when: all_pools.storage_pools | length > 0
+
+# ── Query non-existent pool ──
+- name: Get info for non-existent storage pool
+  microsoft.scvmm.scvmm_storage_pool_info:
+    name: "NonExistentPool_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_pool
+
+- name: Assert no pool returned for non-existent
+  assert:
+    that:
+      - missing_pool is not changed
+      - missing_pool.storage_pools | length == 0
+
+# ── Check mode ──
+- name: Get storage pool info in check mode
+  microsoft.scvmm.scvmm_storage_pool_info:
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode returns data and no change
+  assert:
+    that:
+      - check_mode_result is not changed
+      - check_mode_result.storage_pools is defined
+
+# ── Idempotency ──
+- name: Get storage pools again (idempotency)
+  microsoft.scvmm.scvmm_storage_pool_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert results are consistent across queries
+  assert:
+    that:
+      - second_query is not changed
+      - second_query.storage_pools | length == all_pools.storage_pools | length

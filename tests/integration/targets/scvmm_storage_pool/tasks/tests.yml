@@ -1,0 +1,45 @@
+---
+# ── Negative: manage non-existent storage pool ──
+- name: Attempt to manage non-existent storage pool
+  microsoft.scvmm.scvmm_storage_pool:
+    name: "NonExistentPool_{{ 99999 | random }}"
+    storage_classification: Standard
+    vmm_server: "{{ scvmm_server }}"
+  register: pool_error
+  ignore_errors: true
+
+- name: Assert error for non-existent storage pool
+  assert:
+    that:
+      - pool_error is failed
+      - "'not found' in pool_error.msg"
+
+# ── Check mode: non-existent pool ──
+- name: Manage non-existent storage pool in check mode
+  microsoft.scvmm.scvmm_storage_pool:
+    name: "NonExistentPool_{{ 99999 | random }}"
+    storage_classification: Standard
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_error
+  ignore_errors: true
+
+- name: Assert check mode still fails for non-existent pool
+  assert:
+    that:
+      - check_mode_error is failed
+
+# ── Idempotency: error is consistent ──
+- name: Attempt to manage non-existent pool again
+  microsoft.scvmm.scvmm_storage_pool:
+    name: "NonExistentPool_{{ 99999 | random }}"
+    storage_classification: Standard
+    vmm_server: "{{ scvmm_server }}"
+  register: pool_error_again
+  ignore_errors: true
+
+- name: Assert error is consistent across attempts
+  assert:
+    that:
+      - pool_error_again is failed
+      - "'not found' in pool_error_again.msg"

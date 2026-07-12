@@ -1,0 +1,15 @@
+---
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Verify no resources to clean (info-only module)
+      microsoft.scvmm.scvmm_storage_pool_info:
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      assert:
+        that:
+          - teardown_validate is not changed
