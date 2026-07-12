@@ -20,16 +20,16 @@ $vm_name = $module.Params.vm_name
 $name = $module.Params.name
 $vmm_server = $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "CheckpointID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "creation_time"; Property = "AddedTime"; Type = "datetime_iso" }
+)
+
 $vmmConnection = Connect-SCVMMServerSession -VMMServer $vmm_server -Module $module
 
-$vms = @(Get-SCVirtualMachine -VMMServer $vmmConnection -Name $vm_name -ErrorAction Stop)
-if ($vms.Count -eq 0) {
-    $module.FailJson("Virtual machine '$vm_name' not found")
-}
-if ($vms.Count -gt 1) {
-    $module.FailJson("Multiple virtual machines found with name '$vm_name'. VM names are not guaranteed to be unique in SCVMM.")
-}
-$vm = $vms[0]
+$vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $vm_name
 
 $checkpoints = @(Get-SCVMCheckpoint -VM $vm -ErrorAction SilentlyContinue)
 
@@ -38,12 +38,7 @@ if ($name) {
 }
 
 $module.Result.checkpoints = @($checkpoints | ForEach-Object {
-        @{
-            id = $_.CheckpointID.ToString()
-            name = $_.Name
-            description = $_.Description
-            creation_time = $_.AddedTime.ToString('o')
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()

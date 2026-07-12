@@ -34,40 +34,28 @@ $state = $module.Params.state
 $description = $module.Params.description
 $path = $module.Params.path
 
-$module.Result.changed = $false
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "status"; Property = "Status"; Type = "enum" }
+    @{ Param = "host"; Property = "HostName"; Type = "string" }
+)
 
-function Get-VmResult {
-    param($VmObject)
-    return @{
-        id = $VmObject.ID.ToString()
-        name = $VmObject.Name
-        status = $VmObject.Status
-        host = $VmObject.HostName
-    }
-}
+$module.Result.changed = $false
 
 try {
     $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $vmm_server
 
     if ($state -eq 'present') {
-        $existingVm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $name -ErrorAction Stop
-
-        if ($existingVm -and $existingVm.Count -gt 1) {
-            $module.FailJson("Multiple VMs found with name '$name'. Cannot determine which VM to manage.")
-        }
+        $existingVm = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+            -CmdletName 'Get-SCVirtualMachine' -Name $name -ObjectType 'virtual machine'
 
         if ($existingVm) {
-            $module.Result.vm = Get-VmResult -VmObject $existingVm
+            $module.Result.vm = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $existingVm
         }
         else {
             if (-not $module.CheckMode) {
-                $sourceVmObject = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $source_vm -ErrorAction Stop
-                if (-not $sourceVmObject) {
-                    $module.FailJson("Source VM '$source_vm' not found")
-                }
-                if ($sourceVmObject.Count -gt 1) {
-                    $module.FailJson("Multiple VMs found with name '$source_vm'. Cannot determine which VM to clone.")
-                }
+                $sourceVmObject = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $source_vm
 
                 $cloneParams = @{
                     Name = $name
@@ -111,7 +99,7 @@ try {
                 }
 
                 $clonedVm = New-SCVirtualMachine @cloneParams -ErrorAction Stop
-                $module.Result.vm = Get-VmResult -VmObject $clonedVm
+                $module.Result.vm = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $clonedVm
             }
             $module.Result.changed = $true
         }

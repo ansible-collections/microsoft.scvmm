@@ -42,41 +42,32 @@ $hardwareProfile = $module.Params.hardware_profile
 $generation = $module.Params.generation
 $path = $module.Params.path
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "status"; Property = "Status"; Type = "enum" }
+    @{ Param = "host"; Property = "VMHost"; Type = "nested_name" }
+    @{ Param = "cpu_count"; Property = "CPUCount"; Type = "int" }
+    @{ Param = "memory_mb"; Property = "Memory"; Type = "int" }
+    @{ Param = "generation"; Property = "Generation"; Type = "int" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
+)
+
+$updateMap = @(
+    @{ Param = "cpu_count"; Property = "CPUCount"; Type = "int" }
+    @{ Param = "memory_mb"; Property = "Memory"; Type = "int"; CmdletParam = "MemoryMB" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
+)
+
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $vmmServer
-
-$vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $name -ErrorAction SilentlyContinue
-
-function Get-VmResultDict {
-    param([object]$VmObject)
-    $hostName = $null
-    if ($VmObject.VMHost) {
-        $hostName = $VmObject.VMHost.Name
-    }
-    return @{
-        id = $VmObject.ID.ToString()
-        name = $VmObject.Name
-        status = $VmObject.Status.ToString()
-        host = $hostName
-        cpu_count = $VmObject.CPUCount
-        memory_mb = $VmObject.Memory
-        generation = $VmObject.Generation
-        description = $VmObject.Description
-    }
-}
 
 if ($state -eq 'absent') {
     $removeResult = Remove-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $name
 
     if ($removeResult.vm) {
-        $hostName = $null
-        if ($removeResult.vm.VMHost) {
-            $hostName = $removeResult.vm.VMHost.Name
-        }
-        $module.Diff.before = @{
-            name = $removeResult.vm.Name
-            status = $removeResult.vm.Status.ToString()
-            host = $hostName
-        }
+        $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $removeResult.vm
         $module.Diff.after = @{}
     }
 
@@ -85,6 +76,9 @@ if ($state -eq 'absent') {
     $module.Result.state = 'absent'
 }
 else {
+    $vm = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+        -CmdletName 'Get-SCVirtualMachine' -Name $name -ObjectType 'virtual machine'
+
     if (-not $vm) {
         $createParams = @{
             Name = $name
@@ -185,7 +179,7 @@ else {
         $module.Result.state = 'present'
 
         if (-not $module.CheckMode) {
-            $module.Result.vm = Get-VmResultDict -VmObject $vm
+            $module.Result.vm = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $vm
             $module.Diff.after = $module.Result.vm
         }
         else {
@@ -203,36 +197,12 @@ else {
         }
     }
     else {
-        $updateParams = @{}
-        $needsUpdate = $false
-
-        $beforeState = @{
-            name = $vm.Name
-            cpu_count = $vm.CPUCount
-            memory_mb = $vm.Memory
-            description = $vm.Description
-        }
-
-        $propertyMap = @(
-            @{ Param = $cpuCount; SCVMMKey = 'CPUCount'; ResultKey = 'cpu_count'; Current = $vm.CPUCount }
-            @{ Param = $memoryMb; SCVMMKey = 'MemoryMB'; ResultKey = 'memory_mb'; Current = $vm.Memory }
-            @{ Param = $description; SCVMMKey = 'Description'; ResultKey = 'description'; Current = $vm.Description }
-        )
-
-        foreach ($prop in $propertyMap) {
-            if ($prop.Param -and $prop.Current -ne $prop.Param) {
-                $updateParams[$prop.SCVMMKey] = $prop.Param
-                $needsUpdate = $true
-            }
-        }
-
-        if ($null -ne $dynamicMemory -and $vm.DynamicMemoryEnabled -ne $dynamicMemory) {
-            $updateParams.DynamicMemoryEnabled = $dynamicMemory
-            $needsUpdate = $true
-        }
+        $updateParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
+            -AnsibleParams $module.Params -CurrentObject $vm
+        $needsUpdate = $updateParams.Count -gt 0
 
         if ($needsUpdate) {
-            $module.Diff.before = $beforeState
+            $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $vm
             if (-not $module.CheckMode) {
                 try {
                     $vm = Set-SCVirtualMachine -VM $vm @updateParams -ErrorAction Stop
@@ -250,24 +220,15 @@ else {
 
         $module.Result.name = $name
         $module.Result.state = 'present'
+        $module.Result.vm = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $vm
 
-        if (-not $module.CheckMode) {
-            $module.Result.vm = Get-VmResultDict -VmObject $vm
-            if ($needsUpdate) {
+        if ($needsUpdate) {
+            if ($module.CheckMode) {
+                $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                    -UpdateMap $updateMap -AnsibleParams $module.Params -CurrentObject $vm
+            }
+            else {
                 $module.Diff.after = $module.Result.vm
-            }
-        }
-        else {
-            $afterState = $beforeState.Clone()
-            foreach ($prop in $propertyMap) {
-                if ($prop.Param) {
-                    $afterState[$prop.ResultKey] = $prop.Param
-                }
-            }
-
-            $module.Result.vm = Get-VmResultDict -VmObject $vm
-            if ($needsUpdate) {
-                $module.Diff.after = $afterState
             }
         }
     }

@@ -15,6 +15,21 @@ $spec = @{
 
 $module = [Ansible.Basic.AnsibleModule]::Create($args, $spec)
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "owner"; Property = "Owner"; Type = "string" }
+    @{ Param = "cpu_count"; Property = "CPUCount"; Type = "int" }
+    @{ Param = "memory_mb"; Property = "Memory"; Type = "int" }
+    @{ Param = "generation"; Property = "Generation"; Type = "int" }
+    @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
+    @{ Param = "operating_system"; Property = "OperatingSystem"; Type = "nested_name" }
+    @{ Param = "status"; Property = "Status"; Type = "enum" }
+    @{ Param = "creation_time"; Property = "AddedTime"; Type = "datetime_iso" }
+    @{ Param = "enabled"; Property = "Enabled"; Type = "bool" }
+)
+
 $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
@@ -32,28 +47,7 @@ catch {
 }
 
 $module.Result.templates = @($templates | ForEach-Object {
-        $osName = $null
-        if ($_.OperatingSystem) {
-            $osName = $_.OperatingSystem.Name
-        }
-        $creationTime = $null
-        if ($_.AddedTime) {
-            $creationTime = $_.AddedTime.ToString('o')
-        }
-        @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            description = $_.Description
-            owner = $_.Owner
-            cpu_count = $_.CPUCount
-            memory_mb = $_.Memory
-            generation = $_.Generation
-            dynamic_memory = $_.DynamicMemoryEnabled
-            operating_system = $osName
-            status = $_.Status.ToString()
-            creation_time = $creationTime
-            enabled = $_.Enabled
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()

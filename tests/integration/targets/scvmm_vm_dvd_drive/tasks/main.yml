@@ -12,6 +12,17 @@
         vmm_server: "{{ scvmm_server }}"
         state: present
 
+    - name: Setup - Discover SCSI adapters on test VM
+      microsoft.scvmm.scvmm_vm_scsi_adapter_info:
+        vm_name: "{{ test_vm }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: scsi_info
+
+    - name: Setup - Set non-default bus/lun based on available SCSI adapters
+      set_fact:
+        test_alt_bus: "{{ (scsi_info.scsi_adapters | length) - 1 if (scsi_info.scsi_adapters | length) > 1 else 0 }}"
+        test_alt_lun: "{{ 0 if (scsi_info.scsi_adapters | length) > 1 else 2 }}"
+
     - name: Run tests
       ansible.builtin.include_tasks: tests.yml
 

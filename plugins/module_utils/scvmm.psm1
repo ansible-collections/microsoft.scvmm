@@ -74,7 +74,7 @@ Builds a result hashtable from an SCVMM object using a property map.
 
 .PARAMETER PropertyMap
 Array of hashtables. Each must contain 'Param' (Ansible return key) and 'Property' (SCVMM object property).
-Supported Type values: 'string', 'bool', 'enum', 'int', 'id', 'bytes_to_gb', 'name_list'.
+Supported Type values: 'string', 'bool', 'enum', 'int', 'id', 'bytes_to_gb', 'name_list', 'nested_name', 'datetime_iso'.
 
 .PARAMETER CurrentObject
 The SCVMM object to extract properties from.
@@ -102,7 +102,7 @@ function Get-SCVMMResultFromMap {
                 $result.($map.Param) = [bool]$val
             }
             "string" {
-                $result.($map.Param) = if ([string]::IsNullOrEmpty($val)) { $null } else { [string]$val }
+                $result.($map.Param) = if ($null -ne $val) { [string]$val } else { $null }
             }
             "int" {
                 $result.($map.Param) = $val
@@ -112,6 +112,12 @@ function Get-SCVMMResultFromMap {
             }
             "name_list" {
                 $result.($map.Param) = if ($val) { @($val | ForEach-Object { $_.Name }) } else { @() }
+            }
+            "nested_name" {
+                $result.($map.Param) = if ($null -ne $val) { $val.Name } else { $null }
+            }
+            "datetime_iso" {
+                $result.($map.Param) = if ($null -ne $val) { $val.ToString('o') } else { $null }
             }
             default {
                 $result.($map.Param) = $val
@@ -123,18 +129,39 @@ function Get-SCVMMResultFromMap {
 
 <#
 .SYNOPSIS
+Compares a single property value using type-aware comparison.
+#>
+function Test-SCVMMPropertyChanged {
+    param (
+        [string]$Type,
+        $CurrentValue,
+        $DesiredValue
+    )
+
+    switch ($Type) {
+        "enum" {
+            $curStr = if ($null -ne $CurrentValue) { $CurrentValue.ToString() } else { "" }
+            return $curStr -ne $DesiredValue
+        }
+        "string" {
+            return [string]$CurrentValue -ne [string]$DesiredValue
+        }
+        "bool" {
+            return [bool]$CurrentValue -ne [bool]$DesiredValue
+        }
+        "bytes_to_gb" {
+            $curGb = if ($null -ne $CurrentValue) { [math]::Round($CurrentValue / 1GB, 2) } else { $null }
+            return $curGb -ne $DesiredValue
+        }
+        default {
+            return $CurrentValue -ne $DesiredValue
+        }
+    }
+}
+
+<#
+.SYNOPSIS
 Compares current SCVMM object properties against desired Ansible parameters.
-
-.DESCRIPTION
-Returns $true if any mapped property differs between the current object and desired parameters.
-Only compares properties where the Ansible parameter is not null.
-
-.PARAMETER PropertyMap
-The property mapping definition.
-.PARAMETER CurrentObject
-The current SCVMM object.
-.PARAMETER AnsibleParams
-The $module.Params object.
 #>
 function Test-SCVMMPropertiesChanged {
     param (
@@ -153,21 +180,8 @@ function Test-SCVMMPropertiesChanged {
         if ($null -eq $paramValue) { continue }
 
         $currentValue = $CurrentObject.($map.Property)
-
-        switch ($map.Type) {
-            "enum" {
-                $curStr = if ($null -ne $currentValue) { $currentValue.ToString() } else { "" }
-                if ($curStr -ne $paramValue) { return $true }
-            }
-            "string" {
-                if ([string]$currentValue -ne [string]$paramValue) { return $true }
-            }
-            "bool" {
-                if ([bool]$currentValue -ne [bool]$paramValue) { return $true }
-            }
-            default {
-                if ($currentValue -ne $paramValue) { return $true }
-            }
+        if (Test-SCVMMPropertyChanged -Type $map.Type -CurrentValue $currentValue -DesiredValue $paramValue) {
+            return $true
         }
     }
     return $false
@@ -188,7 +202,9 @@ function Get-SCVMMParametersFromMap {
         [array]$PropertyMap,
 
         [Parameter(Mandatory = $true)]
-        $AnsibleParams
+        $AnsibleParams,
+
+        $CurrentObject
     )
 
     $outParams = @{}
@@ -196,10 +212,52 @@ function Get-SCVMMParametersFromMap {
         $paramValue = $AnsibleParams.($map.Param)
         if ($null -eq $paramValue) { continue }
 
+        if ($CurrentObject) {
+            $currentValue = $CurrentObject.($map.Property)
+            if (-not (Test-SCVMMPropertyChanged -Type $map.Type -CurrentValue $currentValue -DesiredValue $paramValue)) {
+                continue
+            }
+        }
+
         $targetParam = if ($null -ne $map.CmdletParam) { $map.CmdletParam } else { $map.Property }
         $outParams.($targetParam) = $paramValue
     }
     return $outParams
+}
+
+<#
+.SYNOPSIS
+Projects a diff.after hashtable for check-mode by overlaying desired parameters onto the before-state.
+#>
+function Get-SCVMMCheckModeDiff {
+    param (
+        [Parameter(Mandatory = $true)]
+        [hashtable]$Before,
+
+        [Parameter(Mandatory = $true)]
+        [array]$UpdateMap,
+
+        [Parameter(Mandatory = $true)]
+        $AnsibleParams,
+
+        $CurrentObject
+    )
+
+    $projected = $Before.Clone()
+    foreach ($map in $UpdateMap) {
+        $paramValue = $AnsibleParams.($map.Param)
+        if ($null -eq $paramValue) { continue }
+
+        if ($CurrentObject) {
+            $currentValue = $CurrentObject.($map.Property)
+            if (-not (Test-SCVMMPropertyChanged -Type $map.Type -CurrentValue $currentValue -DesiredValue $paramValue)) {
+                continue
+            }
+        }
+
+        $projected[$map.Param] = $paramValue
+    }
+    return $projected
 }
 
 <#
@@ -323,4 +381,4 @@ function Get-SCVMMVirtualMachine {
 
 Export-ModuleMember -Function 'Connect-SCVMMServerSession', 'Remove-SCVMMVirtualMachine', `
     'Get-SCVMMResultFromMap', 'Test-SCVMMPropertiesChanged', 'Get-SCVMMParametersFromMap', `
-    'Get-SCVMMObject', 'Get-SCVMMVirtualMachine'
+    'Get-SCVMMCheckModeDiff', 'Get-SCVMMObject', 'Get-SCVMMVirtualMachine'

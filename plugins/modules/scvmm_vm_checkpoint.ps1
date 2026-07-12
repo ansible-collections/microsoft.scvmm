@@ -25,24 +25,18 @@ $state = $module.Params.state
 $vmm_server = $module.Params.vmm_server
 $description = $module.Params.description
 
-$module.Result.changed = $false
+$propertyMap = @(
+    @{ Param = "id"; Property = "CheckpointID"; Type = "id" }
+    @{ Param = "creation_time"; Property = "AddedTime"; Type = "datetime_iso" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+)
 
-function Get-CheckpointResult {
-    param($Checkpoint)
-    return @{
-        id = $Checkpoint.CheckpointID.ToString()
-        creation_time = $Checkpoint.AddedTime.ToString('o')
-        description = $Checkpoint.Description
-    }
-}
+$module.Result.changed = $false
 
 try {
     $vmmConnection = Connect-SCVMMServerSession -VMMServer $vmm_server -Module $module
 
-    $vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $vm_name -ErrorAction Stop
-    if (-not $vm) {
-        $module.FailJson("Virtual machine '$vm_name' not found")
-    }
+    $vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $vm_name
 
     $checkpoint = Get-SCVMCheckpoint -VM $vm -ErrorAction SilentlyContinue |
         Where-Object { $_.Name -eq $name }
@@ -64,7 +58,7 @@ try {
             }
 
             if ($checkpoint) {
-                $module.Result.checkpoint = Get-CheckpointResult -Checkpoint $checkpoint
+                $module.Result.checkpoint = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $checkpoint
             }
         }
         'absent' {
@@ -84,7 +78,7 @@ try {
                 Restore-SCVMCheckpoint -VMCheckpoint $checkpoint
             }
             $module.Result.changed = $true
-            $module.Result.checkpoint = Get-CheckpointResult -Checkpoint $checkpoint
+            $module.Result.checkpoint = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $checkpoint
         }
     }
 }

@@ -27,18 +27,17 @@ $adapter_id = $module.Params.adapter_id
 $scsi_adapter_id = $module.Params.scsi_adapter_id
 $shared = $module.Params.shared
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "adapter_id"; Property = "AdapterID"; Type = "int" }
+    @{ Param = "shared"; Property = "Shared"; Type = "bool" }
+)
+
 $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -VMMServer $vmm_server -Module $module
 
-$vms = @(Get-SCVirtualMachine -VMMServer $vmmConnection -Name $vm_name -ErrorAction Stop)
-if ($vms.Count -eq 0) {
-    $module.FailJson("Virtual machine '$vm_name' not found")
-}
-if ($vms.Count -gt 1) {
-    $module.FailJson("Multiple virtual machines found with name '$vm_name'. VM names are not guaranteed to be unique in SCVMM.")
-}
-$vm = $vms[0]
+$vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $vm_name
 
 $adapters = @(Get-SCVirtualScsiAdapter -VM $vm)
 
@@ -50,15 +49,6 @@ elseif ($null -ne $adapter_id) {
     $existingAdapter = $adapters | Where-Object { $_.AdapterID -eq $adapter_id } | Select-Object -First 1
 }
 
-function Get-AdapterResult {
-    param($Adapter)
-    return @{
-        id = $Adapter.ID.ToString()
-        adapter_id = $Adapter.AdapterID
-        shared = $Adapter.Shared
-    }
-}
-
 if ($state -eq 'present') {
     if ($null -eq $existingAdapter) {
         if (-not $module.CheckMode) {
@@ -68,7 +58,7 @@ if ($state -eq 'present') {
             catch {
                 $module.FailJson("Failed to create SCSI adapter on VM '$vm_name': $($_.Exception.Message)", $_)
             }
-            $module.Result.scsi_adapter = Get-AdapterResult -Adapter $newAdapter
+            $module.Result.scsi_adapter = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $newAdapter
         }
         else {
             $module.Result.scsi_adapter = @{
@@ -88,7 +78,7 @@ if ($state -eq 'present') {
                 catch {
                     $module.FailJson("Failed to update SCSI adapter on VM '$vm_name': $($_.Exception.Message)", $_)
                 }
-                $module.Result.scsi_adapter = Get-AdapterResult -Adapter $updatedAdapter
+                $module.Result.scsi_adapter = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $updatedAdapter
             }
             else {
                 $module.Result.scsi_adapter = @{
@@ -100,7 +90,7 @@ if ($state -eq 'present') {
             $module.Result.changed = $true
         }
         else {
-            $module.Result.scsi_adapter = Get-AdapterResult -Adapter $existingAdapter
+            $module.Result.scsi_adapter = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $existingAdapter
         }
     }
 }

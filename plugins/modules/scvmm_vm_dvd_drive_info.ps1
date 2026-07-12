@@ -18,30 +18,21 @@ $module = [Ansible.Basic.AnsibleModule]::Create($args, $spec)
 $vm_name = $module.Params.vm_name
 $vmm_server = $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "bus"; Property = "Bus"; Type = "int" }
+    @{ Param = "lun"; Property = "LUN"; Type = "int" }
+    @{ Param = "iso"; Property = "ISO"; Type = "nested_name" }
+)
+
 $vmmConnection = Connect-SCVMMServerSession -VMMServer $vmm_server -Module $module
 
-$vms = @(Get-SCVirtualMachine -VMMServer $vmmConnection -Name $vm_name -ErrorAction Stop)
-if ($vms.Count -eq 0) {
-    $module.FailJson("Virtual machine '$vm_name' not found")
-}
-if ($vms.Count -gt 1) {
-    $module.FailJson("Multiple virtual machines found with name '$vm_name'. VM names are not guaranteed to be unique in SCVMM.")
-}
-$vm = $vms[0]
+$vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $vm_name
 
 $dvdDrives = @(Get-SCVirtualDVDDrive -VM $vm -ErrorAction SilentlyContinue)
 
 $module.Result.dvd_drives = @($dvdDrives | ForEach-Object {
-        $isoName = $null
-        if ($_.ISO) {
-            $isoName = $_.ISO.Name
-        }
-        @{
-            id = $_.ID.ToString()
-            bus = $_.Bus
-            lun = $_.LUN
-            iso = $isoName
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()
