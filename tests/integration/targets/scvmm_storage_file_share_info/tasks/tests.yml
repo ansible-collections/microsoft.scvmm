@@ -1,0 +1,63 @@
+---
+# ── Query all storage file shares ──
+- name: Get all storage file shares
+  microsoft.scvmm.scvmm_storage_file_share_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_shares
+
+- name: Assert module returns list and reports no change
+  assert:
+    that:
+      - all_shares is not changed
+      - all_shares.storage_file_shares is defined
+
+- name: Validate return payload fields when shares exist
+  assert:
+    that:
+      - all_shares.storage_file_shares[0].id is defined
+      - all_shares.storage_file_shares[0].name is defined
+      - all_shares.storage_file_shares[0].share_path is defined
+      - all_shares.storage_file_shares[0].description is defined
+      - all_shares.storage_file_shares[0].total_capacity_gb is defined
+      - all_shares.storage_file_shares[0].free_capacity_gb is defined
+      - all_shares.storage_file_shares[0].enabled is defined
+      - all_shares.storage_file_shares[0].host_access is defined
+  when: all_shares.storage_file_shares | length > 0
+
+# ── Query non-existent file share ──
+- name: Get info for non-existent file share
+  microsoft.scvmm.scvmm_storage_file_share_info:
+    name: "NonExistentShare_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_share
+
+- name: Assert no share returned for non-existent
+  assert:
+    that:
+      - missing_share is not changed
+      - missing_share.storage_file_shares | length == 0
+
+# ── Check mode ──
+- name: Get storage file share info in check mode
+  microsoft.scvmm.scvmm_storage_file_share_info:
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode returns data and no change
+  assert:
+    that:
+      - check_mode_result is not changed
+      - check_mode_result.storage_file_shares is defined
+
+# ── Idempotency ──
+- name: Get storage file shares again (idempotency)
+  microsoft.scvmm.scvmm_storage_file_share_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert results are consistent across queries
+  assert:
+    that:
+      - second_query is not changed
+      - second_query.storage_file_shares | length == all_shares.storage_file_shares | length
