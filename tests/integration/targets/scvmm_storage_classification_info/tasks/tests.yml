@@ -1,0 +1,77 @@
+---
+# ── Query all storage classifications ──
+- name: Get all storage classifications
+  microsoft.scvmm.scvmm_storage_classification_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_classifications
+
+- name: Assert list contains our test classification
+  assert:
+    that:
+      - all_classifications is not changed
+      - all_classifications.storage_classifications is defined
+      - all_classifications.storage_classifications | length > 0
+      - all_classifications.storage_classifications | selectattr('name', 'equalto', test_classification_name) | list | length == 1
+
+# ── Query by name ──
+- name: Get test classification by name
+  microsoft.scvmm.scvmm_storage_classification_info:
+    name: "{{ test_classification_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: named_classification
+
+- name: Assert classification returned with all documented fields and correct values
+  assert:
+    that:
+      - named_classification is not changed
+      - named_classification.storage_classifications | length == 1
+      - named_classification.storage_classifications[0].name == test_classification_name
+      - named_classification.storage_classifications[0].description == "Ansible info test classification"
+      - named_classification.storage_classifications[0].id is defined
+      - named_classification.storage_classifications[0].id | length > 0
+      - named_classification.storage_classifications[0].enabled is defined
+      - named_classification.storage_classifications[0].storage_pools is defined
+
+# ── Query non-existent classification ──
+- name: Get info for non-existent storage classification
+  microsoft.scvmm.scvmm_storage_classification_info:
+    name: "NonExistentClassification_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_classification
+
+- name: Assert no classification returned for non-existent
+  assert:
+    that:
+      - missing_classification is not changed
+      - missing_classification.storage_classifications | length == 0
+
+# ── Check mode ──
+- name: Get classification info in check mode
+  microsoft.scvmm.scvmm_storage_classification_info:
+    name: "{{ test_classification_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode returns correct data and no change
+  assert:
+    that:
+      - check_mode_result is not changed
+      - check_mode_result.storage_classifications | length == 1
+      - check_mode_result.storage_classifications[0].name == test_classification_name
+
+# ── Idempotency ──
+- name: Get classification info again (idempotency)
+  microsoft.scvmm.scvmm_storage_classification_info:
+    name: "{{ test_classification_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert results are consistent across queries
+  assert:
+    that:
+      - second_query is not changed
+      - second_query.storage_classifications | length == 1
+      - second_query.storage_classifications[0].name == named_classification.storage_classifications[0].name
+      - second_query.storage_classifications[0].id == named_classification.storage_classifications[0].id
+      - second_query.storage_classifications[0].description == named_classification.storage_classifications[0].description
