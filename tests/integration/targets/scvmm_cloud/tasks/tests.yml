@@ -1,0 +1,133 @@
+---
+# ── Create cloud ──
+- name: Create cloud
+  microsoft.scvmm.scvmm_cloud:
+    name: "{{ test_cloud_name }}"
+    host_group: "{{ test_host_group }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert cloud was created
+  assert:
+    that:
+      - create_result is changed
+      - create_result.cloud.name == test_cloud_name
+
+# ── Verify creation with info module ──
+- name: Verify cloud exists via info module
+  microsoft.scvmm.scvmm_cloud_info:
+    name: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created cloud
+  assert:
+    that:
+      - verify_create.clouds | length == 1
+      - verify_create.clouds[0].name == test_cloud_name
+      - verify_create.clouds[0].id is defined
+      - verify_create.clouds[0].host_groups is defined
+
+# ── Idempotency ──
+- name: Create same cloud again
+  microsoft.scvmm.scvmm_cloud:
+    name: "{{ test_cloud_name }}"
+    host_group: "{{ test_host_group }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update cloud description
+  microsoft.scvmm.scvmm_cloud:
+    name: "{{ test_cloud_name }}"
+    description: "Updated cloud description"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert description was updated
+  assert:
+    that:
+      - update_result is changed
+      - update_result.cloud.description == "Updated cloud description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_cloud_info:
+    name: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  assert:
+    that:
+      - verify_update.clouds[0].description == "Updated cloud description"
+
+# ── Check mode ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_cloud:
+    name: "{{ test_cloud_name }}"
+    description: "Check mode description"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode reports change
+  assert:
+    that:
+      - check_mode_result is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_cloud_info:
+    name: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  assert:
+    that:
+      - verify_check_mode.clouds[0].description == "Updated cloud description"
+
+# ── Delete cloud ──
+- name: Delete cloud
+  microsoft.scvmm.scvmm_cloud:
+    name: "{{ test_cloud_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert cloud was deleted
+  assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify cloud is gone via info module
+  microsoft.scvmm.scvmm_cloud_info:
+    name: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted cloud
+  assert:
+    that:
+      - verify_delete.clouds | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted cloud
+  microsoft.scvmm.scvmm_cloud:
+    name: "{{ test_cloud_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  assert:
+    that:
+      - absent_noop is not changed

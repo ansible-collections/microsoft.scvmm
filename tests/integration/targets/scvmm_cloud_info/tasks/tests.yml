@@ -1,0 +1,57 @@
+---
+# ── Query by name ──
+- name: Get test cloud by name
+  microsoft.scvmm.scvmm_cloud_info:
+    name: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected data
+  assert:
+    that:
+      - by_name is not changed
+      - by_name.clouds | length == 1
+      - by_name.clouds[0].name == test_cloud_name
+      - by_name.clouds[0].description == "Test cloud for info query"
+      - by_name.clouds[0].id is defined
+      - by_name.clouds[0].id | length > 0
+      - by_name.clouds[0].host_groups is defined
+
+# ── Query all ──
+- name: Get all clouds
+  microsoft.scvmm.scvmm_cloud_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_clouds
+
+- name: Assert test cloud appears in all clouds
+  assert:
+    that:
+      - all_clouds.clouds | length > 0
+      - test_cloud_name in (all_clouds.clouds | map(attribute='name') | list)
+
+# ── Query non-existent ──
+- name: Query non-existent cloud
+  microsoft.scvmm.scvmm_cloud_info:
+    name: "NonExistentCloud_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_cloud
+
+- name: Assert empty list for non-existent cloud
+  assert:
+    that:
+      - missing_cloud.clouds | length == 0
+      - missing_cloud is not changed
+
+# ── Idempotency / stability ──
+- name: Query same cloud again
+  microsoft.scvmm.scvmm_cloud_info:
+    name: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns same data
+  assert:
+    that:
+      - second_query.clouds[0].id == by_name.clouds[0].id
+      - second_query.clouds[0].name == by_name.clouds[0].name
+      - second_query.clouds[0].description == by_name.clouds[0].description

@@ -1,0 +1,33 @@
+---
+- hosts: windows
+  gather_facts: false
+  vars_files:
+    - ../defaults/main.yml
+  tasks:
+    - name: Define test variables
+      set_fact:
+        test_cloud_name: "AnsibleTest_Cloud_{{ 99999 | random }}"
+        test_host_group: "All Hosts"
+
+    - block:
+        - name: Run tests
+          ansible.builtin.include_tasks: tests.yml
+
+      always:
+        - name: Teardown - Remove test cloud
+          microsoft.scvmm.scvmm_cloud:
+            name: "{{ test_cloud_name }}"
+            state: absent
+            vmm_server: "{{ scvmm_server }}"
+          ignore_errors: true
+
+        - name: Teardown - Validate cloud removed
+          microsoft.scvmm.scvmm_cloud_info:
+            name: "{{ test_cloud_name }}"
+            vmm_server: "{{ scvmm_server }}"
+          register: teardown_validate
+
+        - name: Teardown - Assert server is clean
+          assert:
+            that:
+              - teardown_validate.clouds | length == 0

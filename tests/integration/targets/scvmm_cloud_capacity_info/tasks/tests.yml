@@ -1,0 +1,41 @@
+---
+# ── Query capacity ──
+- name: Get cloud capacity
+  microsoft.scvmm.scvmm_cloud_capacity_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: cap_info
+
+- name: Assert capacity matches set values
+  assert:
+    that:
+      - cap_info is not changed
+      - cap_info.cloud_capacity.cloud == test_cloud_name
+      - cap_info.cloud_capacity.cpu_count == 8
+      - cap_info.cloud_capacity.memory_gb == 32
+      - cap_info.cloud_capacity.storage_gb == 200
+      - cap_info.cloud_capacity.vm_count == 10
+
+# ── Verify all properties exist ──
+- name: Assert all expected properties are present
+  assert:
+    that:
+      - cap_info.cloud_capacity.used_cpu_count is defined
+      - cap_info.cloud_capacity.used_memory_gb is defined
+      - cap_info.cloud_capacity.used_storage_gb is defined
+      - cap_info.cloud_capacity.used_vm_count is defined
+
+# ── Stability ──
+- name: Query capacity again
+  microsoft.scvmm.scvmm_cloud_capacity_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns same data
+  assert:
+    that:
+      - second_query.cloud_capacity.cpu_count == cap_info.cloud_capacity.cpu_count
+      - second_query.cloud_capacity.memory_gb == cap_info.cloud_capacity.memory_gb
+      - second_query.cloud_capacity.storage_gb == cap_info.cloud_capacity.storage_gb
+      - second_query.cloud_capacity.vm_count == cap_info.cloud_capacity.vm_count

@@ -1,0 +1,106 @@
+---
+# ── Set capacity ──
+- name: Set cloud capacity
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    cpu_count: 10
+    memory_gb: 16
+    storage_gb: 100
+    vm_count: 5
+    vmm_server: "{{ scvmm_server }}"
+  register: set_result
+
+- name: Assert capacity was set
+  assert:
+    that:
+      - set_result is changed
+      - set_result.cloud_capacity.cpu_count == 10
+      - set_result.cloud_capacity.memory_gb == 16
+      - set_result.cloud_capacity.storage_gb == 100
+      - set_result.cloud_capacity.vm_count == 5
+
+# ── Verify with info module ──
+- name: Verify capacity via info module
+  microsoft.scvmm.scvmm_cloud_capacity_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_set
+
+- name: Assert info module sees set capacity
+  assert:
+    that:
+      - verify_set.cloud_capacity.cpu_count == 10
+      - verify_set.cloud_capacity.memory_gb == 16
+      - verify_set.cloud_capacity.storage_gb == 100
+      - verify_set.cloud_capacity.vm_count == 5
+      - verify_set.cloud_capacity.cloud == test_cloud_name
+
+# ── Idempotency ──
+- name: Set same capacity again
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    cpu_count: 10
+    memory_gb: 16
+    storage_gb: 100
+    vm_count: 5
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent set
+  assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Partial update ──
+- name: Update only cpu_count
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    cpu_count: 20
+    vmm_server: "{{ scvmm_server }}"
+  register: partial_result
+
+- name: Assert partial update changed
+  assert:
+    that:
+      - partial_result is changed
+      - partial_result.cloud_capacity.cpu_count == 20
+
+# ── Verify partial update with info module ──
+- name: Verify partial update via info module
+  microsoft.scvmm.scvmm_cloud_capacity_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_partial
+
+- name: Assert info module sees partial update
+  assert:
+    that:
+      - verify_partial.cloud_capacity.cpu_count == 20
+      - verify_partial.cloud_capacity.memory_gb == 16
+      - verify_partial.cloud_capacity.storage_gb == 100
+      - verify_partial.cloud_capacity.vm_count == 5
+
+# ── Check mode ──
+- name: Update capacity in check mode
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    cpu_count: 50
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode reports change
+  assert:
+    that:
+      - check_mode_result is changed
+
+- name: Verify check mode did not actually change capacity
+  microsoft.scvmm.scvmm_cloud_capacity_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert capacity unchanged after check mode
+  assert:
+    that:
+      - verify_check_mode.cloud_capacity.cpu_count == 20
