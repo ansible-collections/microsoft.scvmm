@@ -1,0 +1,65 @@
+---
+# ── Set capacity limits ──
+- name: Set cloud capacity limits
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    cpu_count: 50
+    memory_gb: 256
+    storage_gb: 1024
+    vm_count: 25
+    vmm_server: "{{ scvmm_server }}"
+  register: set_result
+
+- name: Assert capacity was set
+  assert:
+    that:
+      - set_result is changed
+      - set_result.cloud_capacity.cpu_count == 50
+      - set_result.cloud_capacity.memory_gb == 256
+      - set_result.cloud_capacity.storage_gb == 1024
+      - set_result.cloud_capacity.vm_count == 25
+
+# ── Idempotency ──
+- name: Set same capacity again (idempotency)
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    cpu_count: 50
+    memory_gb: 256
+    storage_gb: 1024
+    vm_count: 25
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent set
+  assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Partial update ──
+- name: Update only VM count
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    vm_count: 100
+    vmm_server: "{{ scvmm_server }}"
+  register: partial_update
+
+- name: Assert partial update worked
+  assert:
+    that:
+      - partial_update is changed
+      - partial_update.cloud_capacity.vm_count == 100
+      - partial_update.cloud_capacity.cpu_count == 50
+
+# ── Check mode ──
+- name: Update capacity in check mode
+  microsoft.scvmm.scvmm_cloud_capacity:
+    cloud: "{{ test_cloud_name }}"
+    cpu_count: 200
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode reports change
+  assert:
+    that:
+      - check_mode_result is changed
