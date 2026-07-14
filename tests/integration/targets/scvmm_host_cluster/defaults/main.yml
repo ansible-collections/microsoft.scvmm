@@ -1,0 +1,5 @@
+---
+scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_cluster_name: test-ansible-cluster
+test_credential_username: administrator@SCVMM.LOCAL
+test_credential_password: Aa123456

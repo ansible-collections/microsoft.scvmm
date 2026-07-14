@@ -1,0 +1,46 @@
+---
+# ── Absent on non-existent cluster (idempotent) ──
+- name: Remove non-existent cluster
+  microsoft.scvmm.scvmm_host_cluster:
+    name: "{{ test_cluster_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change when removing non-existent cluster
+  assert:
+    that:
+      - absent_noop is not changed
+
+# ── Absent idempotent again ──
+- name: Remove non-existent cluster again
+  microsoft.scvmm.scvmm_host_cluster:
+    name: "{{ test_cluster_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop2
+
+- name: Assert still no change
+  assert:
+    that:
+      - absent_noop2 is not changed
+
+# ── Check mode for create ──
+- name: Create cluster in check mode
+  microsoft.scvmm.scvmm_host_cluster:
+    name: "{{ test_cluster_name }}"
+    state: present
+    nodes:
+      - "{{ scvmm_server }}"
+    cluster_ip_address: "10.46.109.200"
+    credential_username: "{{ test_credential_username }}"
+    credential_password: "{{ test_credential_password }}"
+    description: "Test cluster"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: create_check
+
+- name: Assert check mode reports change
+  assert:
+    that:
+      - create_check is changed
