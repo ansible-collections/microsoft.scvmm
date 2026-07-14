@@ -38,7 +38,12 @@ if ($null -eq $vmHost) {
 
 # Get the adapter
 $adapterName = $module.Params.adapter_name
-$adapters = @(Get-SCVMHostNetworkAdapter -VMHost $vmHost -ErrorAction Stop)
+try {
+    $adapters = @(Get-SCVMHostNetworkAdapter -VMHost $vmHost -ErrorAction Stop)
+}
+catch {
+    $module.FailJson("Failed to query network adapters on host '$($module.Params.vm_host)': $($_.Exception.Message)", $_)
+}
 $matchedAdapters = @($adapters | Where-Object { $_.Name -eq $adapterName })
 if ($matchedAdapters.Count -gt 1) {
     $module.FailJson("Multiple adapters found with name '$adapterName' on host '$($module.Params.vm_host)'")

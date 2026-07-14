@@ -1,40 +1,66 @@
 ---
-- hosts: windows
-  gather_facts: false
-  vars_files:
-    - ../defaults/main.yml
-  tasks:
-    - name: Get adapter info to find adapter name
-      microsoft.scvmm.scvmm_host_network_adapter_info:
-        vm_host: "{{ test_host_name }}"
-        vmm_server: "{{ scvmm_server }}"
-      register: adapter_list
+- name: Get adapter info to find adapter name
+  microsoft.scvmm.scvmm_host_network_adapter_info:
+    vm_host: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: adapter_list
 
-    - name: Store test adapter name and original description
-      set_fact:
-        test_adapter_name: "{{ adapter_list.network_adapters[0].name }}"
-        original_adapter_description: ""
+- name: Store test adapter name and original description
+  ansible.builtin.set_fact:
+    test_adapter_name: "{{ adapter_list.network_adapters[0].name }}"
+    original_adapter_description: ""
 
-    - name: Get original adapter state
+- name: Get original adapter state
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: original_state
+
+- name: Store original description from action module
+  ansible.builtin.set_fact:
+    original_adapter_description: "{{ original_state.adapter.description | default('') }}"
+    original_adapter_logical_networks: "{{ [original_state.adapter.logical_networks | default([])] | flatten }}"
+
+- name: Find an available logical network
+  ansible.windows.win_shell: |
+    $ln = Get-SCLogicalNetwork -VMMServer (Get-SCVMMServer "{{ scvmm_server }}") | Select-Object -First 1
+    if ($ln) { $ln.Name } else { "" }
+  register: ln_lookup
+
+- name: Store logical network name
+  ansible.builtin.set_fact:
+    test_logical_network: "{{ ln_lookup.stdout | trim }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Restore original description
       microsoft.scvmm.scvmm_host_network_adapter:
         vm_host: "{{ test_host_name }}"
         adapter_name: "{{ test_adapter_name }}"
+        description: "{{ original_adapter_description }}"
         vmm_server: "{{ scvmm_server }}"
-      register: original_state
+      ignore_errors: true
 
-    - name: Store original description from action module
-      set_fact:
-        original_adapter_description: "{{ original_state.adapter.description | default('') }}"
+    - name: Teardown - Remove test logical network if it was added
+      microsoft.scvmm.scvmm_host_network_adapter:
+        vm_host: "{{ test_host_name }}"
+        adapter_name: "{{ test_adapter_name }}"
+        logical_network: "{{ test_logical_network }}"
+        logical_network_action: remove
+        vmm_server: "{{ scvmm_server }}"
+      when: test_logical_network | length > 0
+      ignore_errors: true
 
-    - block:
-        - name: Run tests
-          ansible.builtin.include_tasks: tests.yml
-
-      always:
-        - name: Teardown - Restore original description
-          microsoft.scvmm.scvmm_host_network_adapter:
-            vm_host: "{{ test_host_name }}"
-            adapter_name: "{{ test_adapter_name }}"
-            description: "{{ original_adapter_description }}"
-            vmm_server: "{{ scvmm_server }}"
-          ignore_errors: true
+    - name: Teardown - Re-add original logical networks
+      microsoft.scvmm.scvmm_host_network_adapter:
+        vm_host: "{{ test_host_name }}"
+        adapter_name: "{{ test_adapter_name }}"
+        logical_network: "{{ item }}"
+        vmm_server: "{{ scvmm_server }}"
+      loop: "{{ original_adapter_logical_networks }}"
+      when: original_adapter_logical_networks | length > 0
+      ignore_errors: true

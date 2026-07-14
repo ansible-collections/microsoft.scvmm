@@ -77,11 +77,12 @@ network_adapters:
       type: int
       returned: when available
       sample: 10000
-    logical_network:
-      description: Name of the associated logical network.
-      type: str
-      returned: when available
-      sample: Management
+    logical_networks:
+      description: List of associated logical network names.
+      type: list
+      elements: str
+      returned: always
+      sample: ["Management"]
     vm_host:
       description: Name of the host this adapter belongs to.
       type: str

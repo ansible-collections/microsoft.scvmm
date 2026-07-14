@@ -41,7 +41,7 @@ $propertyMap = @(
     @{ Param = "connection_name"; Property = "ConnectionName"; Type = "string" }
     @{ Param = "mac_address"; Property = "MacAddress"; Type = "string" }
     @{ Param = "max_bandwidth_mbps"; Property = "MaxBandwidth"; Type = "int" }
-    @{ Param = "logical_network"; Property = "LogicalNetwork"; Type = "nested_name" }
+    @{ Param = "logical_networks"; Property = "LogicalNetworks"; Type = "name_list" }
 )
 
 $module.Result.network_adapters = @($adapters | ForEach-Object {

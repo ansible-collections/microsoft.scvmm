@@ -11,7 +11,7 @@ short_description: Manage host network adapter configuration in System Center Vi
 description:
   - Configure host network adapter settings in SCVMM.
   - Can associate or remove logical networks on physical host NICs.
-  - Can configure placement availability, management usage, and description.
+  - Can configure placement availability and description.
   - This module configures existing adapters and cannot create or delete them.
 options:
   vm_host:
@@ -27,14 +27,15 @@ options:
     required: true
   logical_network:
     description:
-      - Name of the logical network to associate with the adapter.
-      - Use I(logical_network_action) to control whether to add/set or remove.
+      - Name of the logical network to associate with or remove from the adapter.
+      - Use I(logical_network_action) to control whether to add or remove.
+      - This operates on a single logical network at a time. Existing logical network associations are preserved.
     type: str
   logical_network_action:
     description:
       - Action to take with the logical network.
-      - C(set) adds or sets the logical network association.
-      - C(remove) removes the logical network association.
+      - C(set) adds the logical network to the adapter, preserving any existing associations (additive).
+      - C(remove) removes the logical network association from the adapter.
     type: str
     choices: [set, remove]
   description:

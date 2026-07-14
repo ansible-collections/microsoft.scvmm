@@ -7,7 +7,7 @@
   register: by_host
 
 - name: Assert query by host returns adapters
-  assert:
+  ansible.builtin.assert:
     that:
       - by_host is not changed
       - by_host.network_adapters | length > 0
@@ -26,7 +26,7 @@
   register: all_adapters
 
 - name: Assert all query returns adapters
-  assert:
+  ansible.builtin.assert:
     that:
       - all_adapters.network_adapters | length > 0
 
@@ -38,7 +38,7 @@
   register: second_query
 
 - name: Assert repeated query returns same data
-  assert:
+  ansible.builtin.assert:
     that:
       - second_query.network_adapters | length == by_host.network_adapters | length
       - second_query.network_adapters[0].id == by_host.network_adapters[0].id
