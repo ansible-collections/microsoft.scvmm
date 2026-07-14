@@ -1,0 +1,53 @@
+---
+# ── Get host ratings ──
+- name: Get host ratings for VM
+  microsoft.scvmm.scvmm_host_rating_info:
+    vm_name: "{{ test_vm_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: ratings
+
+- name: Assert ratings returned with expected shape
+  ansible.builtin.assert:
+    that:
+      - ratings is not changed
+      - ratings.host_ratings is defined
+      - ratings.host_ratings is iterable
+
+- name: Assert rating fields exist when results available
+  ansible.builtin.assert:
+    that:
+      - ratings.host_ratings[0].host_name is defined
+      - ratings.host_ratings[0].rating is defined
+      - ratings.host_ratings[0].description is defined
+      - ratings.host_ratings[0].transfer_type is defined
+      - ratings.host_ratings[0].zero_rating_reasons is defined
+      - ratings.host_ratings[0].warnings is defined
+      - ratings.host_ratings[0].estimated_disk_remaining_mb is defined
+      - ratings.host_ratings[0].estimated_memory_remaining_mb is defined
+  when: ratings.host_ratings | length > 0
+
+# ── Get ratings with host group filter ──
+- name: Get host ratings with host group
+  microsoft.scvmm.scvmm_host_rating_info:
+    vm_name: "{{ test_vm_name }}"
+    host_group: "All Hosts"
+    vmm_server: "{{ scvmm_server }}"
+  register: ratings_filtered
+
+- name: Assert filtered ratings returned
+  ansible.builtin.assert:
+    that:
+      - ratings_filtered is not changed
+      - ratings_filtered.host_ratings is defined
+
+# ── Stability ──
+- name: Get ratings again
+  microsoft.scvmm.scvmm_host_rating_info:
+    vm_name: "{{ test_vm_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns same count
+  ansible.builtin.assert:
+    that:
+      - second_query.host_ratings | length == ratings.host_ratings | length

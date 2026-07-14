@@ -1,0 +1,17 @@
+---
+- name: Find an existing VM for rating tests
+  ansible.windows.win_shell: |
+    $vm = Get-SCVirtualMachine -VMMServer (Get-SCVMMServer "{{ scvmm_server }}") | Select-Object -First 1
+    if ($vm) { $vm.Name } else { "" }
+  register: vm_lookup
+
+- name: Store VM name
+  ansible.builtin.set_fact:
+    test_vm_name: "{{ vm_lookup.stdout | trim }}"
+
+- name: Skip tests if no VM available
+  ansible.builtin.meta: end_play
+  when: test_vm_name | length == 0
+
+- name: Run tests
+  ansible.builtin.include_tasks: tests.yml
