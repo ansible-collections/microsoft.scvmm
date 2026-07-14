@@ -1,0 +1,24 @@
+---
+- name: Define test variables
+  set_fact:
+    test_cloud_name: "AnsibleTest_Cloud_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Create test cloud via PowerShell
+      ansible.windows.win_shell: |
+        Import-Module VirtualMachineManager
+        $vmm = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+        $hg = Get-SCVMHostGroup -VMMServer $vmm -Name "{{ test_vm_host_group }}"
+        New-SCCloud -VMMServer $vmm -Name "{{ test_cloud_name }}" -VMHostGroup $hg
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test cloud via PowerShell
+      ansible.windows.win_shell: |
+        Import-Module VirtualMachineManager
+        $vmm = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+        $cloud = Get-SCCloud -VMMServer $vmm -Name "{{ test_cloud_name }}"
+        if ($cloud) { Remove-SCCloud -Cloud $cloud }
+      ignore_errors: true

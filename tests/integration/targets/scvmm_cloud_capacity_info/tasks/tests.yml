@@ -1,0 +1,27 @@
+---
+# ── Get cloud capacity ──
+- name: Get cloud capacity info
+  microsoft.scvmm.scvmm_cloud_capacity_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: capacity_info
+
+- name: Assert capacity info was returned
+  assert:
+    that:
+      - capacity_info is not changed
+      - capacity_info.cloud_capacity is defined
+      - capacity_info.cloud_capacity.cloud == test_cloud_name
+
+# ── Verify capacity properties ──
+- name: Assert capacity has expected properties
+  assert:
+    that:
+      - capacity_info.cloud_capacity.cpu_count is defined
+      - capacity_info.cloud_capacity.memory_gb is defined
+      - capacity_info.cloud_capacity.storage_gb is defined
+      - capacity_info.cloud_capacity.vm_count is defined
+      - capacity_info.cloud_capacity.used_cpu_count is defined
+      - capacity_info.cloud_capacity.used_memory_gb is defined
+      - capacity_info.cloud_capacity.used_storage_gb is defined
+      - capacity_info.cloud_capacity.used_vm_count is defined
