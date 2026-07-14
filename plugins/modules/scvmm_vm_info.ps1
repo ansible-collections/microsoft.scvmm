@@ -15,6 +15,20 @@ $spec = @{
 
 $module = [Ansible.Basic.AnsibleModule]::Create($args, $spec)
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "status"; Property = "Status"; Type = "enum" }
+    @{ Param = "host"; Property = "VMHost"; Type = "nested_name" }
+    @{ Param = "cpu_count"; Property = "CPUCount"; Type = "int" }
+    @{ Param = "memory_mb"; Property = "Memory"; Type = "int" }
+    @{ Param = "generation"; Property = "Generation"; Type = "int" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "cloud"; Property = "Cloud"; Type = "nested_name" }
+    @{ Param = "creation_time"; Property = "CreationTime"; Type = "datetime_iso" }
+    @{ Param = "operating_system"; Property = "OperatingSystem"; Type = "nested_name" }
+)
+
 $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
@@ -32,35 +46,7 @@ catch {
 }
 
 $module.Result.virtual_machines = @($vms | ForEach-Object {
-        $hostName = $null
-        if ($_.VMHost) {
-            $hostName = $_.VMHost.Name
-        }
-        $cloudName = $null
-        if ($_.Cloud) {
-            $cloudName = $_.Cloud.Name
-        }
-        $creationTime = $null
-        if ($_.CreationTime) {
-            $creationTime = $_.CreationTime.ToString("o")
-        }
-        $osName = $null
-        if ($_.OperatingSystem) {
-            $osName = $_.OperatingSystem.Name
-        }
-        @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            status = $_.Status.ToString()
-            host = $hostName
-            cpu_count = $_.CPUCount
-            memory_mb = $_.Memory
-            generation = $_.Generation
-            description = $_.Description
-            cloud = $cloudName
-            creation_time = $creationTime
-            operating_system = $osName
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()

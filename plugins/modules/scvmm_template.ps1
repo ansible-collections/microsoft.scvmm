@@ -39,66 +39,42 @@ $generation = $module.Params.generation
 $vmm_server = $module.Params.vmm_server
 $state = $module.Params.state
 
-$module.Result.changed = $false
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "owner"; Property = "Owner"; Type = "string" }
+    @{ Param = "cpu_count"; Property = "CPUCount"; Type = "int" }
+    @{ Param = "memory_mb"; Property = "Memory"; Type = "int" }
+    @{ Param = "generation"; Property = "Generation"; Type = "int" }
+    @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
+    @{ Param = "operating_system"; Property = "OperatingSystem"; Type = "nested_name" }
+    @{ Param = "status"; Property = "Status"; Type = "enum" }
+)
 
-function Get-TemplateResult {
-    param($TemplateObject)
-    $osName = $null
-    if ($TemplateObject.OperatingSystem) {
-        $osName = $TemplateObject.OperatingSystem.Name
-    }
-    return @{
-        id = $TemplateObject.ID.ToString()
-        name = $TemplateObject.Name
-        description = $TemplateObject.Description
-        owner = $TemplateObject.Owner
-        cpu_count = $TemplateObject.CPUCount
-        memory_mb = $TemplateObject.Memory
-        generation = $TemplateObject.Generation
-        dynamic_memory = $TemplateObject.DynamicMemoryEnabled
-        operating_system = $osName
-        status = $TemplateObject.Status.ToString()
-    }
-}
+$updateMap = @(
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "owner"; Property = "Owner"; Type = "string" }
+    @{ Param = "cpu_count"; Property = "CPUCount"; Type = "int" }
+    @{ Param = "memory_mb"; Property = "Memory"; Type = "int"; CmdletParam = "MemoryMB" }
+    @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
+)
+
+$module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $vmm_server
 
 if ($state -eq 'present') {
-    try {
-        $existingTemplate = Get-SCVMTemplate -VMMServer $vmmConnection -Name $name -ErrorAction Stop
-    }
-    catch {
-        $module.FailJson("Failed to query template '$name': $($_.Exception.Message)", $_)
-    }
-
-    if ($existingTemplate -and $existingTemplate.Count -gt 1) {
-        $module.FailJson("Multiple templates found with name '$name'. Cannot determine which template to manage.")
-    }
+    $existingTemplate = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+        -CmdletName 'Get-SCVMTemplate' -Name $name -ObjectType 'template'
 
     if ($existingTemplate) {
-        $updateParams = @{}
-        $needsUpdate = $false
-
-        $propertyMap = @(
-            @{ Param = $description; SCVMMKey = 'Description'; Current = $existingTemplate.Description }
-            @{ Param = $owner; SCVMMKey = 'Owner'; Current = $existingTemplate.Owner }
-            @{ Param = $cpu_count; SCVMMKey = 'CPUCount'; Current = $existingTemplate.CPUCount }
-            @{ Param = $memory_mb; SCVMMKey = 'MemoryMB'; Current = $existingTemplate.Memory }
-        )
-
-        foreach ($prop in $propertyMap) {
-            if ($null -ne $prop.Param -and $prop.Current -ne $prop.Param) {
-                $updateParams[$prop.SCVMMKey] = $prop.Param
-                $needsUpdate = $true
-            }
-        }
-
-        if ($null -ne $dynamic_memory -and $existingTemplate.DynamicMemoryEnabled -ne $dynamic_memory) {
-            $updateParams.DynamicMemoryEnabled = $dynamic_memory
-            $needsUpdate = $true
-        }
+        $updateParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
+            -AnsibleParams $module.Params -CurrentObject $existingTemplate
+        $needsUpdate = $updateParams.Count -gt 0
 
         if ($needsUpdate) {
+            $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $existingTemplate
             if (-not $module.CheckMode) {
                 try {
                     $existingTemplate = Set-SCVMTemplate -VMTemplate $existingTemplate @updateParams -ErrorAction Stop
@@ -110,23 +86,22 @@ if ($state -eq 'present') {
             $module.Result.changed = $true
         }
 
-        $module.Result.template = Get-TemplateResult -TemplateObject $existingTemplate
+        $module.Result.template = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $existingTemplate
+
+        if ($needsUpdate) {
+            if ($module.CheckMode) {
+                $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                    -UpdateMap $updateMap -AnsibleParams $module.Params -CurrentObject $existingTemplate
+            }
+            else {
+                $module.Diff.after = $module.Result.template
+            }
+        }
     }
     else {
         if (-not $module.CheckMode) {
             if ($source_vm) {
-                try {
-                    $vmObject = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $source_vm -ErrorAction Stop
-                }
-                catch {
-                    $module.FailJson("Failed to find source VM '$source_vm': $($_.Exception.Message)", $_)
-                }
-                if (-not $vmObject) {
-                    $module.FailJson("Source VM '$source_vm' not found")
-                }
-                if ($vmObject.Count -gt 1) {
-                    $module.FailJson("Multiple VMs found with name '$source_vm'. Cannot determine which VM to use.")
-                }
+                $vmObject = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $source_vm
 
                 try {
                     $libraryServer = Get-SCLibraryServer -VMMServer $vmmConnection -ErrorAction Stop | Select-Object -First 1
@@ -161,18 +136,9 @@ if ($state -eq 'present') {
                 }
             }
             elseif ($source_template) {
-                try {
-                    $srcTemplate = Get-SCVMTemplate -VMMServer $vmmConnection -Name $source_template -ErrorAction Stop
-                }
-                catch {
-                    $module.FailJson("Failed to find source template '$source_template': $($_.Exception.Message)", $_)
-                }
-                if (-not $srcTemplate) {
-                    $module.FailJson("Source template '$source_template' not found")
-                }
-                if ($srcTemplate.Count -gt 1) {
-                    $module.FailJson("Multiple templates found with name '$source_template'. Cannot determine which to use.")
-                }
+                $srcTemplate = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCVMTemplate' -Name $source_template -ObjectType 'template' `
+                    -FailIfNotFound $true
 
                 $jobGroupId = [System.Guid]::NewGuid()
 
@@ -221,22 +187,14 @@ if ($state -eq 'present') {
             catch {
                 $module.FailJson("Failed to create template '$name': $($_.Exception.Message)", $_)
             }
-            $module.Result.template = Get-TemplateResult -TemplateObject $newTemplate
+            $module.Result.template = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $newTemplate
         }
         $module.Result.changed = $true
     }
 }
 elseif ($state -eq 'absent') {
-    try {
-        $existingTemplate = Get-SCVMTemplate -VMMServer $vmmConnection -Name $name -ErrorAction Stop
-    }
-    catch {
-        $module.FailJson("Failed to query template '$name': $($_.Exception.Message)", $_)
-    }
-
-    if ($existingTemplate -and $existingTemplate.Count -gt 1) {
-        $module.FailJson("Multiple templates found with name '$name'. Cannot determine which template to remove.")
-    }
+    $existingTemplate = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+        -CmdletName 'Get-SCVMTemplate' -Name $name -ObjectType 'template'
 
     if ($existingTemplate) {
         if (-not $module.CheckMode) {

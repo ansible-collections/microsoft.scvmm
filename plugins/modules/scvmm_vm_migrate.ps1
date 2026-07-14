@@ -26,37 +26,25 @@ $path = $module.Params.path
 $module.Result.changed = $false
 
 try {
-    # Connect to SCVMM server
     $vmmConnection = Connect-SCVMMServerSession -VMMServer $vmmServer -Module $module
 
-    # Get the virtual machine
-    $vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $name -ErrorAction Stop
+    $vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $name
 
-    if (-not $vm) {
-        $module.FailJson("Virtual machine '$name' not found")
-    }
-
-    # Get the destination host
     $destHost = Get-SCVMHost -VMMServer $vmmConnection -ComputerName $destinationHost -ErrorAction Stop
 
     if (-not $destHost) {
         $module.FailJson("Destination host '$destinationHost' not found")
     }
 
-    # Get current host information
     $currentHost = $vm.VMHost.Name
-
-    # Set return values
     $module.Result.source_host = $currentHost
     $module.Result.destination_host = $destinationHost
 
-    # Check if VM is already on the destination host
     if ($currentHost -eq $destinationHost) {
         $module.Result.changed = $false
         $module.ExitJson()
     }
 
-    # Set diff information
     $module.Diff.before = @{
         host = $currentHost
     }
@@ -65,7 +53,6 @@ try {
         host = $destinationHost
     }
 
-    # Perform migration if not in check mode
     if (-not $module.CheckMode) {
         $migrateParams = @{
             VM = $vm

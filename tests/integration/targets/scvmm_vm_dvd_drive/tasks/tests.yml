@@ -154,8 +154,8 @@
   microsoft.scvmm.scvmm_vm_dvd_drive:
     vm_name: "{{ test_vm }}"
     vmm_server: "{{ scvmm_server }}"
-    bus: 1
-    lun: 0
+    bus: "{{ test_alt_bus | int }}"
+    lun: "{{ test_alt_lun | int }}"
     state: present
   register: add_dvd_custom
 
@@ -163,16 +163,16 @@
   assert:
     that:
       - add_dvd_custom.changed == true
-      - add_dvd_custom.dvd_drive.bus == 1
-      - add_dvd_custom.dvd_drive.lun == 0
+      - add_dvd_custom.dvd_drive.bus == (test_alt_bus | int)
+      - add_dvd_custom.dvd_drive.lun == (test_alt_lun | int)
       - add_dvd_custom.dvd_drive.id is defined
 
 - name: Remove non-default DVD drive
   microsoft.scvmm.scvmm_vm_dvd_drive:
     vm_name: "{{ test_vm }}"
     vmm_server: "{{ scvmm_server }}"
-    bus: 1
-    lun: 0
+    bus: "{{ test_alt_bus | int }}"
+    lun: "{{ test_alt_lun | int }}"
     state: absent
   register: remove_dvd_custom
 

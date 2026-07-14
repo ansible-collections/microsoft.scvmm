@@ -27,29 +27,19 @@ $bus = $module.Params.bus
 $lun = $module.Params.lun
 $iso = $module.Params.iso
 
-$module.Result.changed = $false
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "bus"; Property = "Bus"; Type = "int" }
+    @{ Param = "lun"; Property = "LUN"; Type = "int" }
+    @{ Param = "iso"; Property = "ISO"; Type = "nested_name" }
+)
 
-function Get-DriveResult {
-    param($Drive)
-    $isoName = $null
-    if ($Drive.ISO) {
-        $isoName = $Drive.ISO.Name
-    }
-    return @{
-        id = $Drive.ID.ToString()
-        bus = $Drive.Bus
-        lun = $Drive.LUN
-        iso = $isoName
-    }
-}
+$module.Result.changed = $false
 
 try {
     $vmmConnection = Connect-SCVMMServerSession -VMMServer $vmm_server -Module $module
 
-    $vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $vm_name -ErrorAction Stop
-    if (-not $vm) {
-        $module.FailJson("Virtual machine '$vm_name' not found")
-    }
+    $vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $vm_name
 
     $dvdDrives = Get-SCVirtualDVDDrive -VM $vm -ErrorAction Stop
     $existingDrive = $dvdDrives | Where-Object { $_.Bus -eq $bus -and $_.LUN -eq $lun }
@@ -88,7 +78,7 @@ try {
         }
 
         if ($existingDrive) {
-            $module.Result.dvd_drive = Get-DriveResult -Drive $existingDrive
+            $module.Result.dvd_drive = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $existingDrive
         }
         else {
             $module.Result.dvd_drive = @{
