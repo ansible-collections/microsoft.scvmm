@@ -1,0 +1,78 @@
+---
+# ── Query current adapter state ──
+- name: Set logical network on adapter (idempotent - already set)
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_vm_host }}"
+    adapter_name: "{{ test_adapter_name }}"
+    logical_network: "{{ test_logical_network }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: set_idempotent
+
+- name: Assert no change when already set
+  assert:
+    that:
+      - set_idempotent is not changed
+      - set_idempotent.adapter is defined
+      - set_idempotent.adapter.name == test_adapter_name
+
+# ── Verify adapter properties ──
+- name: Assert adapter has expected properties
+  assert:
+    that:
+      - set_idempotent.adapter.id is defined
+      - set_idempotent.adapter.connection_name is defined
+      - set_idempotent.adapter.logical_networks is defined
+      - set_idempotent.adapter.available_for_placement is defined
+      - set_idempotent.adapter.vm_host == test_vm_host
+
+# ── Check mode test ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_vm_host }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: "test description check mode"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_result
+
+- name: Assert check mode reports change
+  assert:
+    that:
+      - check_result is changed
+
+# ── Set description ──
+- name: Set adapter description
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_vm_host }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: "Managed by Ansible"
+    vmm_server: "{{ scvmm_server }}"
+  register: set_desc
+
+- name: Assert description was set
+  assert:
+    that:
+      - set_desc is changed
+      - set_desc.adapter.description == "Managed by Ansible"
+
+# ── Idempotent description ──
+- name: Set same description again
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_vm_host }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: "Managed by Ansible"
+    vmm_server: "{{ scvmm_server }}"
+  register: set_desc_again
+
+- name: Assert no change on idempotent description
+  assert:
+    that:
+      - set_desc_again is not changed
+
+# ── Cleanup description ──
+- name: Reset adapter description
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_vm_host }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: ""
+    vmm_server: "{{ scvmm_server }}"

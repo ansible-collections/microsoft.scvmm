@@ -1,0 +1,12 @@
+---
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+  always:
+    - name: Teardown - Reset adapter description
+      microsoft.scvmm.scvmm_host_network_adapter:
+        vm_host: "{{ test_vm_host }}"
+        adapter_name: "{{ test_adapter_name }}"
+        description: ""
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
