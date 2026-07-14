@@ -1,4 +1,24 @@
 ---
+# ── Verify action module absent matches info module empty ──
+- name: Confirm test cluster absent via action module
+  microsoft.scvmm.scvmm_host_cluster:
+    name: "{{ test_cluster_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_result
+
+- name: Verify info module agrees cluster does not exist
+  microsoft.scvmm.scvmm_host_cluster_info:
+    name: "{{ test_cluster_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_result
+
+- name: Assert both modules agree cluster is absent
+  assert:
+    that:
+      - absent_result is not changed
+      - info_result.host_clusters | length == 0
+
 # ── Query all clusters ──
 - name: Get all host clusters
   microsoft.scvmm.scvmm_host_cluster_info:

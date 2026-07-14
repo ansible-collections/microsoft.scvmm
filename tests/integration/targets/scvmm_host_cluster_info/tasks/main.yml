@@ -1,8 +1,22 @@
 ---
-- hosts: windows
-  gather_facts: false
-  vars_files:
-    - ../defaults/main.yml
-  tasks:
+- name: Define test variables
+  set_fact:
+    test_cluster_name: "AnsibleTest_ClusterInfo_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Ensure no leftover test cluster via action module
+      microsoft.scvmm.scvmm_host_cluster:
+        name: "{{ test_cluster_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+
     - name: Run tests
       ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Ensure test cluster absent via action module
+      microsoft.scvmm.scvmm_host_cluster:
+        name: "{{ test_cluster_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
