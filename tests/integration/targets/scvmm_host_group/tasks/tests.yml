@@ -1,0 +1,173 @@
+---
+# ── Create host group ──
+- name: Create host group
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_host_group_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert host group was created
+  assert:
+    that:
+      - create_result is changed
+      - create_result.host_group.name == test_host_group_name
+
+# ── Verify creation with info module ──
+- name: Verify host group exists via info module
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "{{ test_host_group_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created group
+  assert:
+    that:
+      - verify_create.host_groups | length == 1
+      - verify_create.host_groups[0].name == test_host_group_name
+      - verify_create.host_groups[0].id is defined
+      - verify_create.host_groups[0].path is defined
+
+# ── Idempotency ──
+- name: Create same host group again
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_host_group_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update host group description
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_host_group_name }}"
+    description: "Updated test description"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert description was updated
+  assert:
+    that:
+      - update_result is changed
+      - update_result.host_group.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "{{ test_host_group_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  assert:
+    that:
+      - verify_update.host_groups[0].description == "Updated test description"
+
+# ── Create child group ──
+- name: Create child host group
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_child_group_name }}"
+    parent_host_group: "{{ test_host_group_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: child_result
+
+- name: Assert child group was created
+  assert:
+    that:
+      - child_result is changed
+
+# ── Verify child via info module ──
+- name: Verify child group exists via info module
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "{{ test_child_group_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_child
+
+- name: Assert child group has correct parent
+  assert:
+    that:
+      - verify_child.host_groups | length == 1
+      - verify_child.host_groups[0].name == test_child_group_name
+      - verify_child.host_groups[0].parent_host_group == test_host_group_name
+
+# ── Check mode ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_host_group_name }}"
+    description: "Check mode description"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode reports change
+  assert:
+    that:
+      - check_mode_result is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "{{ test_host_group_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  assert:
+    that:
+      - verify_check_mode.host_groups[0].description == "Updated test description"
+
+# ── Delete child group ──
+- name: Delete child host group
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_child_group_name }}"
+    parent_host_group: "{{ test_host_group_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_child
+
+- name: Assert child was deleted
+  assert:
+    that:
+      - delete_child is changed
+
+# ── Delete parent group ──
+- name: Delete host group
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_host_group_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert group was deleted
+  assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify host group is gone via info module
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "{{ test_host_group_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted group
+  assert:
+    that:
+      - verify_delete.host_groups | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted host group
+  microsoft.scvmm.scvmm_host_group:
+    name: "{{ test_host_group_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  assert:
+    that:
+      - absent_noop is not changed

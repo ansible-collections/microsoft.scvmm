@@ -1,0 +1,61 @@
+---
+# ── Query by name ──
+- name: Get test host group by name
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "{{ test_host_group_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected data
+  assert:
+    that:
+      - by_name is not changed
+      - by_name.host_groups | length == 1
+      - by_name.host_groups[0].name == test_host_group_name
+      - by_name.host_groups[0].description == "Test group for info query"
+      - by_name.host_groups[0].id is defined
+      - by_name.host_groups[0].id | length > 0
+      - by_name.host_groups[0].path is defined
+      - by_name.host_groups[0].parent_host_group == "All Hosts"
+      - by_name.host_groups[0].child_host_groups is defined
+      - by_name.host_groups[0].hosts is defined
+      - by_name.host_groups[0].clouds is defined
+
+# ── Query all ──
+- name: Get all host groups
+  microsoft.scvmm.scvmm_host_group_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_groups
+
+- name: Assert test group appears in all groups
+  assert:
+    that:
+      - all_groups.host_groups | length > 0
+      - test_host_group_name in (all_groups.host_groups | map(attribute='name') | list)
+
+# ── Query non-existent ──
+- name: Query non-existent host group
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "NonExistentGroup_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_group
+
+- name: Assert empty list for non-existent group
+  assert:
+    that:
+      - missing_group.host_groups | length == 0
+      - missing_group is not changed
+
+# ── Idempotency / stability ──
+- name: Query same group again
+  microsoft.scvmm.scvmm_host_group_info:
+    name: "{{ test_host_group_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns same data
+  assert:
+    that:
+      - second_query.host_groups[0].id == by_name.host_groups[0].id
+      - second_query.host_groups[0].name == by_name.host_groups[0].name
+      - second_query.host_groups[0].description == by_name.host_groups[0].description

@@ -1,0 +1,34 @@
+---
+- name: Define test variables
+  set_fact:
+    test_host_group_name: "AnsibleTest_HGInfo_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Create test host group
+      microsoft.scvmm.scvmm_host_group:
+        name: "{{ test_host_group_name }}"
+        description: "Test group for info query"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test host group
+      microsoft.scvmm.scvmm_host_group:
+        name: "{{ test_host_group_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate host group removed
+      microsoft.scvmm.scvmm_host_group_info:
+        name: "{{ test_host_group_name }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      assert:
+        that:
+          - teardown_validate.host_groups | length == 0
