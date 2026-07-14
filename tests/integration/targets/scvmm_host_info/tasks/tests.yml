@@ -1,0 +1,55 @@
+---
+# ── Get all hosts ──
+- name: Get all hosts
+  microsoft.scvmm.scvmm_host_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_hosts
+
+- name: Assert hosts were returned
+  assert:
+    that:
+      - all_hosts.hosts is defined
+      - all_hosts.hosts | length > 0
+      - all_hosts is not changed
+
+# ── Verify host properties ──
+- name: Assert host has expected properties
+  assert:
+    that:
+      - all_hosts.hosts[0].id is defined
+      - all_hosts.hosts[0].id | length > 0
+      - all_hosts.hosts[0].name is defined
+      - all_hosts.hosts[0].host_group is defined
+      - all_hosts.hosts[0].status is defined
+      - all_hosts.hosts[0].cpu_count is defined
+      - all_hosts.hosts[0].cpu_count > 0
+      - all_hosts.hosts[0].total_memory_gb is defined
+      - all_hosts.hosts[0].total_memory_gb > 0
+      - all_hosts.hosts[0].available_memory_gb is defined
+      - all_hosts.hosts[0].vm_count is defined
+
+# ── Get specific host by name ──
+- name: Get specific host by name
+  microsoft.scvmm.scvmm_host_info:
+    name: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: specific_host
+
+- name: Assert specific host was returned
+  assert:
+    that:
+      - specific_host.hosts | length == 1
+      - specific_host.hosts[0].name == test_vm_host
+
+# ── Get hosts by host group ──
+- name: Get hosts in host group
+  microsoft.scvmm.scvmm_host_info:
+    host_group: "{{ test_vm_host_group }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: group_hosts
+
+- name: Assert hosts in group were returned
+  assert:
+    that:
+      - group_hosts.hosts is defined
+      - group_hosts.hosts | length > 0
