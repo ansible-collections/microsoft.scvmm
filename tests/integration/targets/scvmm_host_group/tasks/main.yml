@@ -1,0 +1,37 @@
+---
+- name: Define test variables
+  set_fact:
+    test_host_group_name: "AnsibleTest_HostGroup_{{ 99999 | random }}"
+    test_child_group_name: "AnsibleTest_ChildGroup_{{ 99999 | random }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove child host group
+      microsoft.scvmm.scvmm_host_group:
+        name: "{{ test_child_group_name }}"
+        parent_host_group: "{{ test_host_group_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove test host group
+      microsoft.scvmm.scvmm_host_group:
+        name: "{{ test_host_group_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate host group removed
+      microsoft.scvmm.scvmm_host_group:
+        name: "{{ test_host_group_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      assert:
+        that:
+          - teardown_validate.changed == false
