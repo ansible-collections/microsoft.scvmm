@@ -1,27 +1,22 @@
 ---
-- hosts: windows
-  gather_facts: false
-  vars_files:
-    - ../defaults/main.yml
-  tasks:
-    - name: Save original host state
-      microsoft.scvmm.scvmm_host_info:
+- name: Save original host state
+  microsoft.scvmm.scvmm_host_info:
+    name: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: original_state
+
+- name: Store original description
+  set_fact:
+    original_description: "{{ original_state.hosts[0].description | default('') }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Restore original description
+      microsoft.scvmm.scvmm_host:
         name: "{{ test_host_name }}"
+        description: "{{ original_description }}"
         vmm_server: "{{ scvmm_server }}"
-      register: original_state
-
-    - name: Store original description
-      set_fact:
-        original_description: "{{ original_state.hosts[0].description | default('') }}"
-
-    - block:
-        - name: Run tests
-          ansible.builtin.include_tasks: tests.yml
-
-      always:
-        - name: Teardown - Restore original description
-          microsoft.scvmm.scvmm_host:
-            name: "{{ test_host_name }}"
-            description: "{{ original_description }}"
-            vmm_server: "{{ scvmm_server }}"
-          ignore_errors: true
+      ignore_errors: true
