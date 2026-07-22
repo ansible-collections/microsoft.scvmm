@@ -82,19 +82,36 @@ if ($module.Params.state -eq 'present') {
             }
             try {
                 $logicalNetwork = New-SCLogicalNetwork @newParams
+                $module.Result.logical_network = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalNetwork
+                $module.Diff.after = $module.Result.logical_network
             }
             catch {
                 $module.FailJson("Failed to create logical network '$($module.Params.name)': $($_.Exception.Message)", $_)
             }
         }
+        else {
+            $module.Result.logical_network = @{
+                id = $null
+                name = $module.Params.name
+                description = $module.Params.description
+                network_virtualization_enabled = $module.Params.network_virtualization_enabled
+                use_gre = $module.Params.use_gre
+                is_pvlan = $module.Params.is_pvlan
+                definition_isolation = $module.Params.definition_isolation
+                allow_dynamic_vlan_on_vnic = $module.Params.allow_dynamic_vlan_on_vnic
+            }
+            $module.Diff.after = $module.Result.logical_network
+        }
     }
     else {
+        $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalNetwork
+
         $updateParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
             -AnsibleParams $module.Params -CurrentObject $logicalNetwork
         $needsUpdate = $updateParams.Count -gt 0
 
         if ($needsUpdate) {
-            $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalNetwork
+            $module.Result.changed = $true
             if (-not $module.CheckMode) {
                 $updateParams['LogicalNetwork'] = $logicalNetwork
                 $updateParams['ErrorAction'] = 'Stop'
@@ -105,29 +122,16 @@ if ($module.Params.state -eq 'present') {
                     $module.FailJson("Failed to update logical network '$($module.Params.name)': $($_.Exception.Message)", $_)
                 }
             }
-            $module.Result.changed = $true
         }
-    }
 
-    if ($logicalNetwork) {
         $module.Result.logical_network = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalNetwork
-        if ($module.Result.changed -and $module.Diff.before) {
-            if ($module.CheckMode) {
-                $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
-                    -UpdateMap $updateMap -AnsibleParams $module.Params -CurrentObject $logicalNetwork
-            }
-            else {
-                $module.Diff.after = $module.Result.logical_network
-            }
+        if ($needsUpdate -and $module.CheckMode) {
+            $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                -UpdateMap $updateMap -AnsibleParams $module.Params -CurrentObject $logicalNetwork
         }
-    }
-    elseif ($module.CheckMode) {
-        $module.Result.logical_network = @{
-            id = $null
-            name = $module.Params.name
-            description = $module.Params.description
+        else {
+            $module.Diff.after = $module.Result.logical_network
         }
-        $module.Diff.after = $module.Result.logical_network
     }
 }
 else {
