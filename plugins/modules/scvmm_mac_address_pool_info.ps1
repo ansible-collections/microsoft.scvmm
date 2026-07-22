@@ -29,12 +29,12 @@ if ($module.Params.name) {
 
 $module.Result.mac_address_pools = @($pools | ForEach-Object {
         @{
-            id                      = $_.ID.ToString()
-            name                    = $_.Name
-            description             = $_.Description
+            id = $_.ID.ToString()
+            name = $_.Name
+            description = $_.Description
             mac_address_range_start = $_.MACAddressRangeStart
-            mac_address_range_end   = $_.MACAddressRangeEnd
-            host_groups             = @($_.HostGroups | ForEach-Object { $_.Name })
+            mac_address_range_end = $_.MACAddressRangeEnd
+            host_groups = @($_.HostGroups | ForEach-Object { $_.Name })
         }
     })
 

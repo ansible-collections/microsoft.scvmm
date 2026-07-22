@@ -34,12 +34,12 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-PoolResult {
     param($Pool)
     return @{
-        id                      = $Pool.ID.ToString()
-        name                    = $Pool.Name
-        description             = $Pool.Description
+        id = $Pool.ID.ToString()
+        name = $Pool.Name
+        description = $Pool.Description
         mac_address_range_start = $Pool.MACAddressRangeStart
-        mac_address_range_end   = $Pool.MACAddressRangeEnd
-        host_groups             = @($Pool.HostGroups | ForEach-Object { $_.Name })
+        mac_address_range_end = $Pool.MACAddressRangeEnd
+        host_groups = @($Pool.HostGroups | ForEach-Object { $_.Name })
     }
 }
 
@@ -70,12 +70,12 @@ if ($module.Params.state -eq 'present') {
                     })
 
                 $newParams = @{
-                    Name                 = $module.Params.name
+                    Name = $module.Params.name
                     MACAddressRangeStart = $module.Params.mac_address_range_start
-                    MACAddressRangeEnd   = $module.Params.mac_address_range_end
-                    VMHostGroup          = $hostGroups
-                    VMMServer            = $vmmConnection
-                    ErrorAction          = 'Stop'
+                    MACAddressRangeEnd = $module.Params.mac_address_range_end
+                    VMHostGroup = $hostGroups
+                    VMMServer = $vmmConnection
+                    ErrorAction = 'Stop'
                 }
                 if ($null -ne $module.Params.description) {
                     $newParams['Description'] = $module.Params.description
@@ -120,10 +120,10 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.mac_address_pool = @{
-            name                    = $module.Params.name
-            description             = $module.Params.description
+            name = $module.Params.name
+            description = $module.Params.description
             mac_address_range_start = $module.Params.mac_address_range_start
-            mac_address_range_end   = $module.Params.mac_address_range_end
+            mac_address_range_end = $module.Params.mac_address_range_end
         }
         $module.Diff.after = $module.Result.mac_address_pool
     }
