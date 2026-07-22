@@ -42,13 +42,13 @@ else {
 
 $module.Result.vm_subnets = @($subnets | ForEach-Object {
         $result = @{
-            id          = $_.ID.ToString()
-            name        = $_.Name
+            id = $_.ID.ToString()
+            name = $_.Name
             description = $_.Description
-            vm_network  = $_.VMNetwork.Name
+            vm_network = $_.VMNetwork.Name
             subnet_vlans = @($_.SubnetVLans | ForEach-Object {
                     @{
-                        subnet  = $_.Subnet
+                        subnet = $_.Subnet
                         vlan_id = $_.VLanID
                     }
                 })

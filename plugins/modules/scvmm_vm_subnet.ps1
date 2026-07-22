@@ -35,13 +35,13 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-SubnetResult {
     param($Subnet)
     $result = @{
-        id          = $Subnet.ID.ToString()
-        name        = $Subnet.Name
+        id = $Subnet.ID.ToString()
+        name = $Subnet.Name
         description = $Subnet.Description
-        vm_network  = $Subnet.VMNetwork.Name
+        vm_network = $Subnet.VMNetwork.Name
         subnet_vlans = @($Subnet.SubnetVLans | ForEach-Object {
                 @{
-                    subnet  = $_.Subnet
+                    subnet = $_.Subnet
                     vlan_id = $_.VLanID
                 }
             })
@@ -70,9 +70,9 @@ if ($module.Params.state -eq 'present') {
                 $subnetVlan = New-SCSubnetVLan -Subnet $module.Params.subnet -VLanID $module.Params.vlan_id
 
                 $newParams = @{
-                    VMMServer  = $vmmConnection
-                    Name       = $module.Params.name
-                    VMNetwork  = $vmNet
+                    VMMServer = $vmmConnection
+                    Name = $module.Params.name
+                    VMNetwork = $vmNet
                     SubnetVLan = $subnetVlan
                     ErrorAction = 'Stop'
                 }
@@ -127,9 +127,9 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.vm_subnet = @{
-            name        = $module.Params.name
+            name = $module.Params.name
             description = $module.Params.description
-            vm_network  = $module.Params.vm_network
+            vm_network = $module.Params.vm_network
         }
         $module.Diff.after = $module.Result.vm_subnet
     }
