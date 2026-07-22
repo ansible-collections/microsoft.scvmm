@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - scvmm_logical_network - Manage logical networks in SCVMM.
+  - scvmm_logical_network_info - Query logical networks in SCVMM.
