@@ -1,0 +1,45 @@
+---
+# ── Query by host ──
+- name: Get adapters for host
+  microsoft.scvmm.scvmm_host_network_adapter_info:
+    vm_host: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_host
+
+- name: Assert query by host returns adapters
+  ansible.builtin.assert:
+    that:
+      - by_host is not changed
+      - by_host.network_adapters | length > 0
+      - by_host.network_adapters[0].id is defined
+      - by_host.network_adapters[0].id | length > 0
+      - by_host.network_adapters[0].name is defined
+      - by_host.network_adapters[0].connection_name is defined
+      - by_host.network_adapters[0].mac_address is defined
+      - by_host.network_adapters[0].ip_addresses is defined
+      - by_host.network_adapters[0].vm_host == test_host_name
+
+# ── Query all ──
+- name: Get all adapters
+  microsoft.scvmm.scvmm_host_network_adapter_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_adapters
+
+- name: Assert all query returns adapters
+  ansible.builtin.assert:
+    that:
+      - all_adapters.network_adapters | length > 0
+
+# ── Stability ──
+- name: Query same host adapters again
+  microsoft.scvmm.scvmm_host_network_adapter_info:
+    vm_host: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns same data
+  ansible.builtin.assert:
+    that:
+      - second_query.network_adapters | length == by_host.network_adapters | length
+      - second_query.network_adapters[0].id == by_host.network_adapters[0].id
+      - second_query.network_adapters[0].name == by_host.network_adapters[0].name

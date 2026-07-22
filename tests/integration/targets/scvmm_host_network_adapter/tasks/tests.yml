@@ -1,0 +1,180 @@
+---
+# ── Update description ──
+- name: Update adapter description
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: "AnsibleTest_AdapterDesc"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.adapter.description == "AnsibleTest_AdapterDesc"
+      - update_result.adapter.name == test_adapter_name
+
+# ── Verify via info module ──
+- name: Verify adapter via info module
+  microsoft.scvmm.scvmm_host_network_adapter_info:
+    vm_host: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees the adapter
+  ansible.builtin.assert:
+    that:
+      - verify_update.network_adapters | length > 0
+      - test_adapter_name in (verify_update.network_adapters | map(attribute='name') | list)
+
+# ── Idempotency ──
+- name: Set same description again
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: "AnsibleTest_AdapterDesc"
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent update
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Check mode ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: "CheckMode_AdapterDesc"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_result is changed
+
+- name: Verify check mode did not actually change via action module
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    description: "AnsibleTest_AdapterDesc"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode is not changed
+
+# ── Logical network tests (skipped if no LN available) ──
+- name: Add logical network to adapter
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    logical_network: "{{ test_logical_network }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: ln_set_result
+  when: test_logical_network | length > 0
+
+- name: Assert logical network was added
+  ansible.builtin.assert:
+    that:
+      - ln_set_result is changed
+      - test_logical_network in ln_set_result.adapter.logical_networks
+  when: test_logical_network | length > 0
+
+- name: Verify logical network via info module
+  microsoft.scvmm.scvmm_host_network_adapter_info:
+    vm_host: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: ln_verify
+  when: test_logical_network | length > 0
+
+- name: Assert info module shows logical network
+  ansible.builtin.assert:
+    that:
+      - (ln_verify.network_adapters | selectattr('name', 'equalto', test_adapter_name) | first).logical_networks | length > 0
+  when: test_logical_network | length > 0
+
+- name: Add same logical network again (idempotency)
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    logical_network: "{{ test_logical_network }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: ln_idempotent_result
+  when: test_logical_network | length > 0
+
+- name: Assert no change on idempotent logical network set
+  ansible.builtin.assert:
+    that:
+      - ln_idempotent_result is not changed
+  when: test_logical_network | length > 0
+
+- name: Remove logical network from adapter
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    logical_network: "{{ test_logical_network }}"
+    logical_network_action: remove
+    vmm_server: "{{ scvmm_server }}"
+  register: ln_remove_result
+  when: test_logical_network | length > 0
+
+- name: Assert logical network was removed
+  ansible.builtin.assert:
+    that:
+      - ln_remove_result is changed
+      - test_logical_network not in ln_remove_result.adapter.logical_networks
+  when: test_logical_network | length > 0
+
+- name: Remove same logical network again (idempotency)
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    logical_network: "{{ test_logical_network }}"
+    logical_network_action: remove
+    vmm_server: "{{ scvmm_server }}"
+  register: ln_remove_idempotent
+  when: test_logical_network | length > 0
+
+- name: Assert no change on idempotent logical network remove
+  ansible.builtin.assert:
+    that:
+      - ln_remove_idempotent is not changed
+  when: test_logical_network | length > 0
+
+- name: Add logical network in check mode
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    logical_network: "{{ test_logical_network }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: ln_check_mode
+  when: test_logical_network | length > 0
+
+- name: Assert check mode reports change for logical network
+  ansible.builtin.assert:
+    that:
+      - ln_check_mode is changed
+  when: test_logical_network | length > 0
+
+- name: Verify check mode did not add logical network
+  microsoft.scvmm.scvmm_host_network_adapter:
+    vm_host: "{{ test_host_name }}"
+    adapter_name: "{{ test_adapter_name }}"
+    logical_network: "{{ test_logical_network }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: ln_verify_check
+  when: test_logical_network | length > 0
+
+- name: Assert logical network still needs to be added after check mode
+  ansible.builtin.assert:
+    that:
+      - ln_verify_check is changed
+  when: test_logical_network | length > 0
