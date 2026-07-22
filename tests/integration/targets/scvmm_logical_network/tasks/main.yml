@@ -1,0 +1,27 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_ln_name: "AnsibleTest_LN_{{ 99999 | random }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate logical network removed
+      microsoft.scvmm.scvmm_logical_network_info:
+        name: "{{ test_ln_name }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      ansible.builtin.assert:
+        that:
+          - teardown_validate.logical_networks | length == 0

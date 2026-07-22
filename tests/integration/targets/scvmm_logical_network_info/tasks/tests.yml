@@ -1,0 +1,59 @@
+---
+# ── Query by name ──
+- name: Get logical network by name
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected results
+  ansible.builtin.assert:
+    that:
+      - by_name is not changed
+      - by_name.logical_networks | length == 1
+      - by_name.logical_networks[0].name == test_ln_name
+      - by_name.logical_networks[0].description == "Info test logical network"
+      - by_name.logical_networks[0].id is defined
+      - by_name.logical_networks[0].id | length > 0
+      - by_name.logical_networks[0].network_virtualization_enabled is defined
+      - by_name.logical_networks[0].is_pvlan is defined
+      - by_name.logical_networks[0].definition_isolation is defined
+
+# ── Query all ──
+- name: Get all logical networks
+  microsoft.scvmm.scvmm_logical_network_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_networks
+
+- name: Assert test logical network appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_networks is not changed
+      - all_networks.logical_networks | length > 0
+      - test_ln_name in (all_networks.logical_networks | map(attribute='name') | list)
+
+# ── Query non-existent ──
+- name: Query non-existent logical network
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "NonExistent_LN_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent is not changed
+      - non_existent.logical_networks | length == 0
+
+# ── Stability ──
+- name: Query same logical network again
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns consistent results
+  ansible.builtin.assert:
+    that:
+      - second_query.logical_networks | length == 1
+      - second_query.logical_networks[0].id == by_name.logical_networks[0].id

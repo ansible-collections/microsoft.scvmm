@@ -1,0 +1,159 @@
+---
+# ── Create logical network ──
+- name: Create logical network
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    description: "Ansible test logical network"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert logical network was created with correct values
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.logical_network.name == test_ln_name
+      - create_result.logical_network.description == "Ansible test logical network"
+      - create_result.logical_network.id is defined
+      - create_result.logical_network.id | length > 0
+
+# ── Verify creation with info module ──
+- name: Verify logical network via info module
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created logical network
+  ansible.builtin.assert:
+    that:
+      - verify_create.logical_networks | length == 1
+      - verify_create.logical_networks[0].name == test_ln_name
+      - verify_create.logical_networks[0].description == "Ansible test logical network"
+      - verify_create.logical_networks[0].id == create_result.logical_network.id
+
+# ── Idempotency: create same logical network again ──
+- name: Create same logical network again (idempotency)
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    description: "Ansible test logical network"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update logical network description
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert logical network was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.logical_network.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify update via info module
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.logical_networks[0].description == "Updated test description"
+
+# ── Idempotency: same description again ──
+- name: Update with same description (idempotency)
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_idempotent
+
+- name: Assert no change on idempotent update
+  ansible.builtin.assert:
+    that:
+      - update_idempotent is not changed
+
+# ── Check mode: update ──
+- name: Update logical network in check mode
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description unchanged after check mode
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert description still has previous value
+  ansible.builtin.assert:
+    that:
+      - after_check.logical_networks[0].description == "Updated test description"
+
+# ── Delete logical network ──
+- name: Remove logical network
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert logical network was removed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify deletion via info module
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module confirms deletion
+  ansible.builtin.assert:
+    that:
+      - verify_delete.logical_networks | length == 0
+
+# ── Idempotency: remove already-deleted ──
+- name: Remove logical network again (idempotency)
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed
+
+# ── Re-create for teardown validation ──
+- name: Re-create logical network for teardown
+  microsoft.scvmm.scvmm_logical_network:
+    name: "{{ test_ln_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
