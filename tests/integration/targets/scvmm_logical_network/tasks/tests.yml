@@ -32,6 +32,30 @@
       - verify_create.logical_networks[0].description == "Ansible test logical network"
       - verify_create.logical_networks[0].id == create_result.logical_network.id
 
+# ── Info: query all ──
+- name: Get all logical networks
+  microsoft.scvmm.scvmm_logical_network_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_networks
+
+- name: Assert test logical network appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_networks.logical_networks | length > 0
+      - test_ln_name in (all_networks.logical_networks | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Query non-existent logical network
+  microsoft.scvmm.scvmm_logical_network_info:
+    name: "NonExistent_LN_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.logical_networks | length == 0
+
 # ── Idempotency: create same logical network again ──
 - name: Create same logical network again (idempotency)
   microsoft.scvmm.scvmm_logical_network:
