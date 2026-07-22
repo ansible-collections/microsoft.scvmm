@@ -32,6 +32,30 @@
       - verify_create.uplink_port_profiles[0].description == "Ansible test uplink profile"
       - verify_create.uplink_port_profiles[0].id == create_result.uplink_port_profile.id
 
+# ── Info: query all ──
+- name: Get all uplink port profiles
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert test profile appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_profiles.uplink_port_profiles | length > 0
+      - test_profile_name in (all_profiles.uplink_port_profiles | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Query non-existent uplink port profile
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "NonExistent_Profile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.uplink_port_profiles | length == 0
+
 # ── Idempotency ──
 - name: Create same profile again (idempotency)
   microsoft.scvmm.scvmm_uplink_port_profile:
