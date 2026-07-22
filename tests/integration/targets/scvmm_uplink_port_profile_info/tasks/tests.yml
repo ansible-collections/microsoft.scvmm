@@ -1,0 +1,58 @@
+---
+# ── Query by name ──
+- name: Get profile by name
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected results
+  ansible.builtin.assert:
+    that:
+      - by_name is not changed
+      - by_name.uplink_port_profiles | length == 1
+      - by_name.uplink_port_profiles[0].name == test_profile_name
+      - by_name.uplink_port_profiles[0].description == "Info test uplink profile"
+      - by_name.uplink_port_profiles[0].id is defined
+      - by_name.uplink_port_profiles[0].id | length > 0
+      - by_name.uplink_port_profiles[0].enable_network_virtualization is defined
+      - by_name.uplink_port_profiles[0].logical_network_definitions is defined
+
+# ── Query all ──
+- name: Get all profiles
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert test profile appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_profiles is not changed
+      - all_profiles.uplink_port_profiles | length > 0
+      - test_profile_name in (all_profiles.uplink_port_profiles | map(attribute='name') | list)
+
+# ── Query non-existent ──
+- name: Query non-existent profile
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "NonExistent_Profile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent is not changed
+      - non_existent.uplink_port_profiles | length == 0
+
+# ── Stability ──
+- name: Query same profile again
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns consistent results
+  ansible.builtin.assert:
+    that:
+      - second_query.uplink_port_profiles | length == 1
+      - second_query.uplink_port_profiles[0].id == by_name.uplink_port_profiles[0].id
