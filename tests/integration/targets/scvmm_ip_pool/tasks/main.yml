@@ -1,0 +1,43 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_ln_name: "AnsibleTest_IPPool_LN_{{ 99999 | random }}"
+    test_lnd_name: "AnsibleTest_IPPool_LND_{{ 99999 | random }}"
+    test_pool_name: "AnsibleTest_IPPool_{{ 99999 | random }}"
+    test_subnet: "10.88.0.0/24"
+
+- block:
+    - name: Setup - Create logical network and definition via PowerShell
+      ansible.windows.win_shell: |
+        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
+        $ln = New-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -ErrorAction Stop
+        $hg = Get-SCVMHostGroup -VMMServer $vmmServer -Name "All Hosts"
+        $subnetVlan = New-SCSubnetVLan -Subnet "{{ test_subnet }}" -VLanID 0
+        New-SCLogicalNetworkDefinition -Name "{{ test_lnd_name }}" -LogicalNetwork $ln -VMHostGroup $hg -SubnetVLan $subnetVlan -ErrorAction Stop | Out-Null
+        "created"
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+  always:
+    - name: Teardown - Remove IP pool
+      microsoft.scvmm.scvmm_ip_pool:
+        name: "{{ test_pool_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove logical network definition and network via PowerShell
+      ansible.windows.win_shell: |
+        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
+        $lnd = Get-SCLogicalNetworkDefinition -VMMServer $vmmServer -Name "{{ test_lnd_name }}"
+        if ($lnd) {
+          Get-SCStaticIPAddressPool -LogicalNetworkDefinition $lnd | ForEach-Object { Remove-SCStaticIPAddressPool -StaticIPAddressPool $_ -Force | Out-Null }
+          Remove-SCLogicalNetworkDefinition -LogicalNetworkDefinition $lnd -Force | Out-Null
+        }
+        $ln = Get-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}"
+        if ($ln) {
+          Get-SCLogicalNetworkDefinition -LogicalNetwork $ln | ForEach-Object { Remove-SCLogicalNetworkDefinition -LogicalNetworkDefinition $_ -Force | Out-Null }
+          Remove-SCLogicalNetwork -LogicalNetwork $ln -Force | Out-Null
+        }
+        "done"
+      ignore_errors: true
