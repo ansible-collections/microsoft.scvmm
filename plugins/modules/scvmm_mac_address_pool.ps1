@@ -31,16 +31,22 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "mac_address_range_start"; Property = "MACAddressRangeStart"; Type = "string" }
+    @{ Param = "mac_address_range_end"; Property = "MACAddressRangeEnd"; Type = "string" }
+    @{ Param = "host_groups"; Property = "HostGroups"; Type = "name_list" }
+)
+
+$updateMap = @(
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+)
+
 function Get-PoolResult {
     param($Pool)
-    return @{
-        id = $Pool.ID.ToString()
-        name = $Pool.Name
-        description = $Pool.Description
-        mac_address_range_start = $Pool.MACAddressRangeStart
-        mac_address_range_end = $Pool.MACAddressRangeEnd
-        host_groups = @($Pool.HostGroups | ForEach-Object { $_.Name })
-    }
+    return Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $Pool
 }
 
 $pool = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
@@ -81,52 +87,86 @@ if ($module.Params.state -eq 'present') {
                     $newParams['Description'] = $module.Params.description
                 }
                 $pool = New-SCMACAddressPool @newParams
+                $module.Result.mac_address_pool = Get-PoolResult -Pool $pool
+                $module.Diff.after = $module.Result.mac_address_pool
             }
             catch {
                 $module.FailJson("Failed to create MAC address pool '$($module.Params.name)': $($_.Exception.Message)", $_)
             }
         }
+        else {
+            $module.Result.mac_address_pool = @{
+                id = $null
+                name = $module.Params.name
+                description = $module.Params.description
+                mac_address_range_start = $module.Params.mac_address_range_start
+                mac_address_range_end = $module.Params.mac_address_range_end
+                host_groups = if ($module.Params.host_groups) { @($module.Params.host_groups) } else { @() }
+            }
+            $module.Diff.after = $module.Result.mac_address_pool
+        }
     }
     else {
-        $needsUpdate = $false
-        $updateParams = @{}
+        $module.Diff.before = Get-PoolResult -Pool $pool
 
-        if ($null -ne $module.Params.description -and $module.Params.description -ne $pool.Description) {
-            $needsUpdate = $true
-            $updateParams['Description'] = $module.Params.description
+        if ($null -ne $module.Params.mac_address_range_start -and
+            $pool.MACAddressRangeStart -ne $module.Params.mac_address_range_start) {
+            $cur = $pool.MACAddressRangeStart
+            $req = $module.Params.mac_address_range_start
+            $module.Warn("Cannot change 'mac_address_range_start' after creation (current: '$cur', requested: '$req'). Delete and recreate.")
+        }
+        if ($null -ne $module.Params.mac_address_range_end -and
+            $pool.MACAddressRangeEnd -ne $module.Params.mac_address_range_end) {
+            $cur = $pool.MACAddressRangeEnd
+            $req = $module.Params.mac_address_range_end
+            $module.Warn("Cannot change 'mac_address_range_end' after creation (current: '$cur', requested: '$req'). Delete and recreate.")
+        }
+        if ($null -ne $module.Params.host_groups) {
+            $currentHGs = @($pool.HostGroups | ForEach-Object { $_.Name }) | Sort-Object
+            $desiredHGs = @($module.Params.host_groups) | Sort-Object
+            $hgChanged = $false
+            if ($currentHGs.Count -ne $desiredHGs.Count) {
+                $hgChanged = $true
+            }
+            elseif ($currentHGs.Count -gt 0) {
+                $diff = Compare-Object -ReferenceObject $currentHGs -DifferenceObject $desiredHGs -ErrorAction SilentlyContinue
+                if ($diff) { $hgChanged = $true }
+            }
+            if ($hgChanged) {
+                $cur = $currentHGs -join ", "
+                $req = $desiredHGs -join ", "
+                $module.Warn("Cannot change 'host_groups' after creation (current: '$cur', requested: '$req'). Delete and recreate.")
+            }
         }
 
+        $needsUpdate = Test-SCVMMPropertiesChanged -PropertyMap $updateMap `
+            -CurrentObject $pool -AnsibleParams $module.Params
+
         if ($needsUpdate) {
-            $module.Diff.before = Get-PoolResult -Pool $pool
+            $setParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
+                -AnsibleParams $module.Params -CurrentObject $pool
             $module.Result.changed = $true
             if (-not $module.CheckMode) {
-                $updateParams['MACAddressPool'] = $pool
-                $updateParams['ErrorAction'] = 'Stop'
+                $setParams['MACAddressPool'] = $pool
+                $setParams['ErrorAction'] = 'Stop'
                 try {
-                    $pool = Set-SCMACAddressPool @updateParams
+                    $pool = Set-SCMACAddressPool @setParams
                 }
                 catch {
                     $module.FailJson("Failed to update MAC address pool '$($module.Params.name)': $($_.Exception.Message)", $_)
                 }
             }
         }
-    }
 
-    if ($pool) {
         $module.Result.mac_address_pool = Get-PoolResult -Pool $pool
-        if ($module.Result.changed -and $module.Diff.before) {
+        if ($needsUpdate -and $module.CheckMode) {
+            $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                -UpdateMap $updateMap -AnsibleParams $module.Params `
+                -CurrentObject $pool
+        }
+        else {
             $module.Diff.after = $module.Result.mac_address_pool
         }
-    }
-    elseif ($module.CheckMode) {
-        $module.Result.mac_address_pool = @{
-            id = $null
-            name = $module.Params.name
-            description = $module.Params.description
-            mac_address_range_start = $module.Params.mac_address_range_start
-            mac_address_range_end = $module.Params.mac_address_range_end
-        }
-        $module.Diff.after = $module.Result.mac_address_pool
     }
 }
 else {

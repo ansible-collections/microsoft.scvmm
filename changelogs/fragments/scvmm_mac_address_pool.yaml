@@ -1,4 +1,0 @@
----
-minor_changes:
-  - scvmm_mac_address_pool - Manage MAC address pools in SCVMM.
-  - scvmm_mac_address_pool_info - Query MAC address pools in SCVMM.

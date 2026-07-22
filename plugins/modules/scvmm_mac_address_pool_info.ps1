@@ -19,6 +19,15 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "mac_address_range_start"; Property = "MACAddressRangeStart"; Type = "string" }
+    @{ Param = "mac_address_range_end"; Property = "MACAddressRangeEnd"; Type = "string" }
+    @{ Param = "host_groups"; Property = "HostGroups"; Type = "name_list" }
+)
+
 $pools = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
     -CmdletName 'Get-SCMACAddressPool' -Name $module.Params.name `
     -ObjectType 'MAC address pool'
@@ -28,14 +37,7 @@ if ($module.Params.name) {
 }
 
 $module.Result.mac_address_pools = @($pools | ForEach-Object {
-        @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            description = $_.Description
-            mac_address_range_start = $_.MACAddressRangeStart
-            mac_address_range_end = $_.MACAddressRangeEnd
-            host_groups = @($_.HostGroups | ForEach-Object { $_.Name })
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()

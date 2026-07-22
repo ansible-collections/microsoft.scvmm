@@ -2,8 +2,8 @@
 - name: Define test variables
   ansible.builtin.set_fact:
     test_pool_name: "AnsibleTest_MACPool_{{ 99999 | random }}"
-    test_mac_start: "00:1D:D9:AA:00:00"
-    test_mac_end: "00:1D:D9:AA:00:FF"
+    test_mac_start: "00-1D-D9-AA-00-00"
+    test_mac_end: "00-1D-D9-AA-00-FF"
 
 - block:
     - name: Run tests
