@@ -1,0 +1,46 @@
+---
+# ── Remove non-existent cluster (absent idempotency) ──
+- name: Remove non-existent cluster
+  microsoft.scvmm.scvmm_host_cluster:
+    name: "NonExistentCluster_{{ 99999 | random }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent non-existent
+  assert:
+    that:
+      - absent_noop is not changed
+
+# ── Verify non-existent cluster via info module ──
+- name: Verify non-existent cluster via info module
+  microsoft.scvmm.scvmm_host_cluster_info:
+    name: "NonExistentCluster_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_missing
+
+- name: Assert info module returns empty for non-existent cluster
+  assert:
+    that:
+      - verify_missing.host_clusters | length == 0
+      - verify_missing is not changed
+
+# ── Check mode create (missing required params) ──
+- name: Create cluster in check mode
+  microsoft.scvmm.scvmm_host_cluster:
+    name: "AnsibleTest_Cluster_{{ 99999 | random }}"
+    nodes:
+      - "fakenode1.scvmm.local"
+    cluster_ip_address: "10.0.0.100"
+    credential_username: "administrator@SCVMM.LOCAL"
+    credential_password: "FakePassword123"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports change for new cluster
+  assert:
+    that:
+      - check_create is changed
+      - check_create.cluster.name is defined
