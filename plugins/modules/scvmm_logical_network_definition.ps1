@@ -92,11 +92,11 @@ if ($module.Params.state -eq 'present') {
                     })
 
                 $newParams = @{
-                    Name           = $module.Params.name
+                    Name = $module.Params.name
                     LogicalNetwork = $logicalNetwork
-                    SubnetVLan     = $subnetVLans
-                    VMHostGroup    = $hostGroups
-                    ErrorAction    = 'Stop'
+                    SubnetVLan = $subnetVLans
+                    VMHostGroup = $hostGroups
+                    ErrorAction = 'Stop'
                 }
                 $definition = New-SCLogicalNetworkDefinition @newParams
             }
@@ -166,7 +166,7 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.logical_network_definition = @{
-            name            = $module.Params.name
+            name = $module.Params.name
             logical_network = $module.Params.logical_network
         }
         $module.Diff.after = $module.Result.logical_network_definition

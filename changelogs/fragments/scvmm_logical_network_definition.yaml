@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - scvmm_logical_network_definition - Manage logical network definitions with subnet-VLANs and host groups in SCVMM.
+  - scvmm_logical_network_definition_info - Query logical network definitions in SCVMM.
