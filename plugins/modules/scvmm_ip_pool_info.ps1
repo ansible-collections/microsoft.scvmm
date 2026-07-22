@@ -42,16 +42,16 @@ else {
 
 $module.Result.ip_pools = @($pools | ForEach-Object {
         @{
-            id                         = $_.ID.ToString()
-            name                       = $_.Name
-            description                = $_.Description
-            subnet                     = $_.Subnet
-            ip_address_range_start     = $_.IPAddressRangeStart
-            ip_address_range_end       = $_.IPAddressRangeEnd
-            default_gateways           = @($_.DefaultGateways | ForEach-Object { $_.IPAddress })
-            dns_servers                = @($_.DNSServers)
-            dns_suffix                 = $_.DNSSuffix
-            dns_search_suffixes        = @($_.DNSSearchSuffixes)
+            id = $_.ID.ToString()
+            name = $_.Name
+            description = $_.Description
+            subnet = $_.Subnet
+            ip_address_range_start = $_.IPAddressRangeStart
+            ip_address_range_end = $_.IPAddressRangeEnd
+            default_gateways = @($_.DefaultGateways | ForEach-Object { $_.IPAddress })
+            dns_servers = @($_.DNSServers)
+            dns_suffix = $_.DNSSuffix
+            dns_search_suffixes = @($_.DNSSearchSuffixes)
             logical_network_definition = if ($_.LogicalNetworkDefinition) { $_.LogicalNetworkDefinition.Name } else { $null }
         }
     })

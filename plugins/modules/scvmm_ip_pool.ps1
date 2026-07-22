@@ -48,16 +48,16 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-PoolResult {
     param($Pool)
     return @{
-        id                         = $Pool.ID.ToString()
-        name                       = $Pool.Name
-        description                = $Pool.Description
-        subnet                     = $Pool.Subnet
-        ip_address_range_start     = $Pool.IPAddressRangeStart
-        ip_address_range_end       = $Pool.IPAddressRangeEnd
-        default_gateways           = @($Pool.DefaultGateways | ForEach-Object { $_.IPAddress })
-        dns_servers                = @($Pool.DNSServers)
-        dns_suffix                 = $Pool.DNSSuffix
-        dns_search_suffixes        = @($Pool.DNSSearchSuffixes)
+        id = $Pool.ID.ToString()
+        name = $Pool.Name
+        description = $Pool.Description
+        subnet = $Pool.Subnet
+        ip_address_range_start = $Pool.IPAddressRangeStart
+        ip_address_range_end = $Pool.IPAddressRangeEnd
+        default_gateways = @($Pool.DefaultGateways | ForEach-Object { $_.IPAddress })
+        dns_servers = @($Pool.DNSServers)
+        dns_suffix = $Pool.DNSSuffix
+        dns_search_suffixes = @($Pool.DNSSearchSuffixes)
         logical_network_definition = if ($Pool.LogicalNetworkDefinition) { $Pool.LogicalNetworkDefinition.Name } else { $null }
     }
 }
@@ -78,11 +78,11 @@ if ($module.Params.state -eq 'present') {
                 }
 
                 $newParams = @{
-                    VMMServer                  = $vmmConnection
-                    Name                       = $module.Params.name
-                    LogicalNetworkDefinition   = $lnd
-                    Subnet                     = $module.Params.subnet
-                    ErrorAction                = 'Stop'
+                    VMMServer = $vmmConnection
+                    Name = $module.Params.name
+                    LogicalNetworkDefinition = $lnd
+                    Subnet = $module.Params.subnet
+                    ErrorAction = 'Stop'
                 }
                 if ($null -ne $module.Params.description) {
                     $newParams['Description'] = $module.Params.description
@@ -170,9 +170,9 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.ip_pool = @{
-            name                       = $module.Params.name
-            description                = $module.Params.description
-            subnet                     = $module.Params.subnet
+            name = $module.Params.name
+            description = $module.Params.description
+            subnet = $module.Params.subnet
             logical_network_definition = $module.Params.logical_network_definition
         }
         $module.Diff.after = $module.Result.ip_pool
