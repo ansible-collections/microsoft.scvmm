@@ -34,6 +34,43 @@
       - verify_create.vm_networks[0].description == "Ansible test VM network"
       - verify_create.vm_networks[0].id == create_result.vm_network.id
 
+# ── Info: query by logical network ──
+- name: Get VM networks by logical network
+  microsoft.scvmm.scvmm_vm_network_info:
+    logical_network: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_ln
+
+- name: Assert query by logical network returns test VM network
+  ansible.builtin.assert:
+    that:
+      - by_ln.vm_networks | length >= 1
+      - test_vmnet_name in (by_ln.vm_networks | map(attribute='name') | list)
+
+# ── Info: query all ──
+- name: Get all VM networks
+  microsoft.scvmm.scvmm_vm_network_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_nets
+
+- name: Assert test VM network appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_nets.vm_networks | length > 0
+      - test_vmnet_name in (all_nets.vm_networks | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Query non-existent VM network
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "NonExistent_VMNet_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.vm_networks | length == 0
+
 # ── Idempotency ──
 - name: Create same VM network again (idempotency)
   microsoft.scvmm.scvmm_vm_network:
