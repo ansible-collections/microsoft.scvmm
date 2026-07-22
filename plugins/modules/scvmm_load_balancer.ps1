@@ -36,18 +36,21 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
-function Get-LBResult {
-    param($LB)
-    return @{
-        id = $LB.ID.ToString()
-        address = $LB.Address
-        port = $LB.Port
-        manufacturer = $LB.Manufacturer
-        model = $LB.Model
-        configuration_provider = if ($LB.ConfigurationProvider) { $LB.ConfigurationProvider.Name } else { $null }
-        host_groups = @($LB.HostGroups | ForEach-Object { $_.Name })
-    }
-}
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "address"; Property = "Address"; Type = "string" }
+    @{ Param = "port"; Property = "Port"; Type = "int" }
+    @{ Param = "manufacturer"; Property = "Manufacturer"; Type = "string" }
+    @{ Param = "model"; Property = "Model"; Type = "string" }
+    @{ Param = "configuration_provider"; Property = "ConfigurationProvider"; Type = "nested_name" }
+    @{ Param = "host_groups"; Property = "HostGroups"; Type = "name_list" }
+)
+
+$updateMap = @(
+    @{ Param = "port"; Property = "Port"; Type = "int" }
+    @{ Param = "manufacturer"; Property = "Manufacturer"; Type = "string" }
+    @{ Param = "model"; Property = "Model"; Type = "string" }
+)
 
 $lb = Get-SCLoadBalancer -VMMServer $vmmConnection -LoadBalancerAddress $module.Params.address -ErrorAction SilentlyContinue
 
@@ -82,57 +85,62 @@ if ($module.Params.state -eq 'present') {
                     -RunAsAccount $runAs `
                     -VMHostGroup $hostGroups `
                     -ErrorAction Stop
+                $module.Result.load_balancer = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $lb
+                $module.Diff.after = $module.Result.load_balancer
             }
             catch {
                 $module.FailJson("Failed to add load balancer '$($module.Params.address)': $($_.Exception.Message)", $_)
             }
         }
+        else {
+            $module.Result.load_balancer = @{
+                id = $null
+                address = $module.Params.address
+                port = $module.Params.port
+                manufacturer = $module.Params.manufacturer
+                model = $module.Params.model
+                configuration_provider = $module.Params.configuration_provider
+                host_groups = if ($module.Params.host_groups) { @($module.Params.host_groups) } else { @() }
+            }
+            $module.Diff.after = $module.Result.load_balancer
+        }
     }
     else {
-        $needsUpdate = $false
-        $updateParams = @{}
+        $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $lb
 
-        if ($null -ne $module.Params.port -and $module.Params.port -ne $lb.Port) {
-            $needsUpdate = $true
-            $updateParams['Port'] = $module.Params.port
-        }
+        $needsUpdate = Test-SCVMMPropertiesChanged -PropertyMap $updateMap `
+            -CurrentObject $lb -AnsibleParams $module.Params
 
         if ($needsUpdate) {
-            $module.Diff.before = Get-LBResult -LB $lb
+            $setParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
+                -AnsibleParams $module.Params -CurrentObject $lb
             $module.Result.changed = $true
             if (-not $module.CheckMode) {
-                $updateParams['LoadBalancer'] = $lb
-                $updateParams['ErrorAction'] = 'Stop'
+                $setParams['LoadBalancer'] = $lb
+                $setParams['ErrorAction'] = 'Stop'
                 try {
-                    $lb = Set-SCLoadBalancer @updateParams
+                    $lb = Set-SCLoadBalancer @setParams
                 }
                 catch {
                     $module.FailJson("Failed to update load balancer '$($module.Params.address)': $($_.Exception.Message)", $_)
                 }
             }
         }
-    }
 
-    if ($lb) {
-        $module.Result.load_balancer = Get-LBResult -LB $lb
-        if ($module.Result.changed -and $module.Diff.before) {
+        $module.Result.load_balancer = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $lb
+        if ($needsUpdate -and $module.CheckMode) {
+            $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                -UpdateMap $updateMap -AnsibleParams $module.Params `
+                -CurrentObject $lb
+        }
+        else {
             $module.Diff.after = $module.Result.load_balancer
         }
-    }
-    elseif ($module.CheckMode) {
-        $module.Result.load_balancer = @{
-            id = $null
-            address = $module.Params.address
-            port = $module.Params.port
-            manufacturer = $module.Params.manufacturer
-            model = $module.Params.model
-        }
-        $module.Diff.after = $module.Result.load_balancer
     }
 }
 else {
     if ($lb) {
-        $module.Diff.before = Get-LBResult -LB $lb
+        $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $lb
         $module.Diff.after = @{}
         $module.Result.changed = $true
         if (-not $module.CheckMode) {

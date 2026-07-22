@@ -20,6 +20,16 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "address"; Property = "Address"; Type = "string" }
+    @{ Param = "port"; Property = "Port"; Type = "int" }
+    @{ Param = "manufacturer"; Property = "Manufacturer"; Type = "string" }
+    @{ Param = "model"; Property = "Model"; Type = "string" }
+    @{ Param = "configuration_provider"; Property = "ConfigurationProvider"; Type = "nested_name" }
+    @{ Param = "host_groups"; Property = "HostGroups"; Type = "name_list" }
+)
+
 $getParams = @{
     VMMServer = $vmmConnection
     ErrorAction = 'SilentlyContinue'
@@ -35,15 +45,7 @@ if ($module.Params.manufacturer) {
 $lbs = @(Get-SCLoadBalancer @getParams)
 
 $module.Result.load_balancers = @($lbs | ForEach-Object {
-        @{
-            id = $_.ID.ToString()
-            address = $_.Address
-            port = $_.Port
-            manufacturer = $_.Manufacturer
-            model = $_.Model
-            configuration_provider = if ($_.ConfigurationProvider) { $_.ConfigurationProvider.Name } else { $null }
-            host_groups = @($_.HostGroups | ForEach-Object { $_.Name })
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()
