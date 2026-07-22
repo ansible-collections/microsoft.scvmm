@@ -45,21 +45,29 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "subnet"; Property = "Subnet"; Type = "string" }
+    @{ Param = "ip_address_range_start"; Property = "IPAddressRangeStart"; Type = "string" }
+    @{ Param = "ip_address_range_end"; Property = "IPAddressRangeEnd"; Type = "string" }
+    @{ Param = "dns_suffix"; Property = "DNSSuffix"; Type = "string" }
+    @{ Param = "logical_network_definition"; Property = "LogicalNetworkDefinition"; Type = "nested_name" }
+)
+
+$updateMap = @(
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "dns_suffix"; Property = "DNSSuffix"; Type = "string" }
+)
+
 function Get-PoolResult {
     param($Pool)
-    return @{
-        id = $Pool.ID.ToString()
-        name = $Pool.Name
-        description = $Pool.Description
-        subnet = $Pool.Subnet
-        ip_address_range_start = $Pool.IPAddressRangeStart
-        ip_address_range_end = $Pool.IPAddressRangeEnd
-        default_gateways = @($Pool.DefaultGateways | ForEach-Object { $_.IPAddress })
-        dns_servers = @($Pool.DNSServers)
-        dns_suffix = $Pool.DNSSuffix
-        dns_search_suffixes = @($Pool.DNSSearchSuffixes)
-        logical_network_definition = if ($Pool.LogicalNetworkDefinition) { $Pool.LogicalNetworkDefinition.Name } else { $null }
-    }
+    $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $Pool
+    $result['default_gateways'] = @($Pool.DefaultGateways | ForEach-Object { $_.IPAddress })
+    $result['dns_servers'] = @($Pool.DNSServers)
+    $result['dns_search_suffixes'] = @($Pool.DNSSearchSuffixes)
+    return $result
 }
 
 $pool = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
@@ -109,74 +117,91 @@ if ($module.Params.state -eq 'present') {
                 }
 
                 $pool = New-SCStaticIPAddressPool @newParams
+                $module.Result.ip_pool = Get-PoolResult -Pool $pool
+                $module.Diff.after = $module.Result.ip_pool
             }
             catch {
                 $module.FailJson("Failed to create IP address pool '$($module.Params.name)': $($_.Exception.Message)", $_)
             }
         }
+        else {
+            $module.Result.ip_pool = @{
+                id = $null
+                name = $module.Params.name
+                description = $module.Params.description
+                subnet = $module.Params.subnet
+                ip_address_range_start = $module.Params.ip_address_range_start
+                ip_address_range_end = $module.Params.ip_address_range_end
+                default_gateways = if ($module.Params.default_gateways) { @($module.Params.default_gateways) } else { @() }
+                dns_servers = if ($module.Params.dns_servers) { @($module.Params.dns_servers) } else { @() }
+                dns_suffix = $module.Params.dns_suffix
+                dns_search_suffixes = if ($module.Params.dns_search_suffixes) { @($module.Params.dns_search_suffixes) } else { @() }
+                logical_network_definition = $module.Params.logical_network_definition
+            }
+            $module.Diff.after = $module.Result.ip_pool
+        }
     }
     else {
-        $needsUpdate = $false
-        $updateParams = @{}
+        $module.Diff.before = Get-PoolResult -Pool $pool
 
-        if ($null -ne $module.Params.description -and $module.Params.description -ne $pool.Description) {
-            $needsUpdate = $true
-            $updateParams['Description'] = $module.Params.description
+        $needsUpdate = Test-SCVMMPropertiesChanged -PropertyMap $updateMap `
+            -CurrentObject $pool -AnsibleParams $module.Params
+        $setParams = @{}
+
+        if ($needsUpdate) {
+            $setParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
+                -AnsibleParams $module.Params -CurrentObject $pool
         }
+
         if ($null -ne $module.Params.dns_servers) {
             $current = @($pool.DNSServers) -join ','
             $desired = @($module.Params.dns_servers) -join ','
             if ($current -ne $desired) {
                 $needsUpdate = $true
-                $updateParams['DNSServer'] = $module.Params.dns_servers
+                $setParams['DNSServer'] = $module.Params.dns_servers
             }
-        }
-        if ($null -ne $module.Params.dns_suffix -and $module.Params.dns_suffix -ne $pool.DNSSuffix) {
-            $needsUpdate = $true
-            $updateParams['DNSSuffix'] = $module.Params.dns_suffix
         }
         if ($null -ne $module.Params.default_gateways) {
             $current = @($pool.DefaultGateways | ForEach-Object { $_.IPAddress }) -join ','
             $desired = @($module.Params.default_gateways) -join ','
             if ($current -ne $desired) {
                 $needsUpdate = $true
-                $updateParams['DefaultGateway'] = @($module.Params.default_gateways | ForEach-Object {
+                $setParams['DefaultGateway'] = @($module.Params.default_gateways | ForEach-Object {
                         New-SCDefaultGateway -IPAddress $_ -ErrorAction Stop
                     })
             }
         }
 
         if ($needsUpdate) {
-            $module.Diff.before = Get-PoolResult -Pool $pool
             $module.Result.changed = $true
             if (-not $module.CheckMode) {
-                $updateParams['StaticIPAddressPool'] = $pool
-                $updateParams['ErrorAction'] = 'Stop'
+                $setParams['StaticIPAddressPool'] = $pool
+                $setParams['ErrorAction'] = 'Stop'
                 try {
-                    $pool = Set-SCStaticIPAddressPool @updateParams
+                    $pool = Set-SCStaticIPAddressPool @setParams
                 }
                 catch {
                     $module.FailJson("Failed to update IP address pool '$($module.Params.name)': $($_.Exception.Message)", $_)
                 }
             }
         }
-    }
 
-    if ($pool) {
         $module.Result.ip_pool = Get-PoolResult -Pool $pool
-        if ($module.Result.changed -and $module.Diff.before) {
+        if ($needsUpdate -and $module.CheckMode) {
+            $projected = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                -UpdateMap $updateMap -AnsibleParams $module.Params `
+                -CurrentObject $pool
+            if ($null -ne $module.Params.dns_servers) {
+                $projected['dns_servers'] = @($module.Params.dns_servers)
+            }
+            if ($null -ne $module.Params.default_gateways) {
+                $projected['default_gateways'] = @($module.Params.default_gateways)
+            }
+            $module.Diff.after = $projected
+        }
+        else {
             $module.Diff.after = $module.Result.ip_pool
         }
-    }
-    elseif ($module.CheckMode) {
-        $module.Result.ip_pool = @{
-            id = $null
-            name = $module.Params.name
-            description = $module.Params.description
-            subnet = $module.Params.subnet
-            logical_network_definition = $module.Params.logical_network_definition
-        }
-        $module.Diff.after = $module.Result.ip_pool
     }
 }
 else {
