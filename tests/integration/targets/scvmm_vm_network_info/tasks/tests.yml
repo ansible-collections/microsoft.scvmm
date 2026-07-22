@@ -1,0 +1,72 @@
+---
+# ── Query by name ──
+- name: Get VM network by name
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected results
+  ansible.builtin.assert:
+    that:
+      - by_name is not changed
+      - by_name.vm_networks | length == 1
+      - by_name.vm_networks[0].name == test_vmnet_name
+      - by_name.vm_networks[0].description == "Info test VM network"
+      - by_name.vm_networks[0].logical_network == test_ln_name
+      - by_name.vm_networks[0].id is defined
+      - by_name.vm_networks[0].id | length > 0
+      - by_name.vm_networks[0].isolation_type is defined
+
+# ── Query by logical network ──
+- name: Get VM networks by logical network
+  microsoft.scvmm.scvmm_vm_network_info:
+    logical_network: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_ln
+
+- name: Assert query by logical network returns test VM network
+  ansible.builtin.assert:
+    that:
+      - by_ln is not changed
+      - by_ln.vm_networks | length >= 1
+      - test_vmnet_name in (by_ln.vm_networks | map(attribute='name') | list)
+
+# ── Query all ──
+- name: Get all VM networks
+  microsoft.scvmm.scvmm_vm_network_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_nets
+
+- name: Assert test VM network appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_nets is not changed
+      - all_nets.vm_networks | length > 0
+      - test_vmnet_name in (all_nets.vm_networks | map(attribute='name') | list)
+
+# ── Query non-existent ──
+- name: Query non-existent VM network
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "NonExistent_VMNet_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent is not changed
+      - non_existent.vm_networks | length == 0
+
+# ── Stability ──
+- name: Query same VM network again
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns consistent results
+  ansible.builtin.assert:
+    that:
+      - second_query.vm_networks | length == 1
+      - second_query.vm_networks[0].id == by_name.vm_networks[0].id
