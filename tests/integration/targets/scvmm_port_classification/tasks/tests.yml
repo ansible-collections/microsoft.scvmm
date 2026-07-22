@@ -29,6 +29,30 @@
       - verify_create.port_classifications[0].id is defined
       - verify_create.port_classifications[0].description == "AnsibleTest port classification"
 
+# ── Info: query all ──
+- name: Get all port classifications
+  microsoft.scvmm.scvmm_port_classification_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_classifications
+
+- name: Assert test classification appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_classifications.port_classifications | length > 0
+      - test_port_class_name in (all_classifications.port_classifications | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Get non-existent port classification
+  microsoft.scvmm.scvmm_port_classification_info:
+    name: "NonExistent_PortClass_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.port_classifications | length == 0
+
 # ── Idempotency ──
 - name: Create same port classification again
   microsoft.scvmm.scvmm_port_classification:
