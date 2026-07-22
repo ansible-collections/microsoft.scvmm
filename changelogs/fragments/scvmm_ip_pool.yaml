@@ -1,4 +1,0 @@
----
-minor_changes:
-  - scvmm_ip_pool - Manage IP pools in SCVMM.
-  - scvmm_ip_pool_info - Query IP pools in SCVMM.
