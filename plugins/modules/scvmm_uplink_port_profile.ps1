@@ -31,14 +31,14 @@ $module.Result.changed = $false
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
 function Get-ProfileResult {
-    param($Profile)
+    param($uplinkProfile)
     $result = @{
-        id = $Profile.ID.ToString()
-        name = $Profile.Name
-        description = $Profile.Description
-        enable_network_virtualization = [bool]$Profile.EnableNetworkVirtualization
+        id = $uplinkProfile.ID.ToString()
+        name = $uplinkProfile.Name
+        description = $uplinkProfile.Description
+        enable_network_virtualization = [bool]$uplinkProfile.EnableNetworkVirtualization
     }
-    $result.logical_network_definitions = @($Profile.LogicalNetworkDefinitions | ForEach-Object { $_.Name })
+    $result.logical_network_definitions = @($uplinkProfile.LogicalNetworkDefinitions | ForEach-Object { $_.Name })
     return $result
 }
 
