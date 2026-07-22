@@ -20,6 +20,14 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "logical_network"; Property = "LogicalNetwork"; Type = "nested_name" }
+    @{ Param = "isolation_type"; Property = "IsolationType"; Type = "enum" }
+)
+
 $getParams = @{
     VMMServer = $vmmConnection
     ErrorAction = 'Stop'
@@ -53,13 +61,7 @@ if ($module.Params.name) {
 }
 
 $module.Result.vm_networks = @($vmNetworks | ForEach-Object {
-        @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            description = $_.Description
-            logical_network = $_.LogicalNetwork.Name
-            isolation_type = [string]$_.IsolationType
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()

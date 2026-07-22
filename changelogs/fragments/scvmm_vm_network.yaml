@@ -1,4 +1,0 @@
----
-minor_changes:
-  - scvmm_vm_network - Manage VM networks in SCVMM.
-  - scvmm_vm_network_info - Query VM networks in SCVMM.
