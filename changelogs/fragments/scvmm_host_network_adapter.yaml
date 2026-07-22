@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - scvmm_host_network_adapter - Manage virtual network adapters in SCVMM.
+  - scvmm_host_network_adapter_info - Query virtual network adapters in SCVMM.
