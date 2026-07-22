@@ -166,6 +166,7 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.logical_network_definition = @{
+            id = $null
             name = $module.Params.name
             logical_network = $module.Params.logical_network
         }
