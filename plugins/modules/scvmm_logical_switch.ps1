@@ -122,6 +122,7 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.logical_switch = @{
+            id = $null
             name = $module.Params.name
             description = $module.Params.description
             minimum_bandwidth_mode = $module.Params.minimum_bandwidth_mode
