@@ -1,0 +1,24 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_vm: "AnsibleTest_NIC_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Create test VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_vm }}"
+        template: "{{ test_vm_template }}"
+        vm_host: "{{ test_vm_host }}"
+        vmm_server: "{{ scvmm_server }}"
+        state: present
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
