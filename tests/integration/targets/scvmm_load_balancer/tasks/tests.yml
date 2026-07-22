@@ -1,0 +1,43 @@
+---
+# ============================================================
+# Info module - query all (no load balancers expected in test env)
+# ============================================================
+- name: Get all load balancers (info)
+  microsoft.scvmm.scvmm_load_balancer_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_lbs
+
+- name: Verify info returns list
+  ansible.builtin.assert:
+    that:
+      - all_lbs.load_balancers is defined
+      - all_lbs.load_balancers | type_debug == 'list'
+
+# ============================================================
+# Info module - query by non-existent address
+# ============================================================
+- name: Query non-existent load balancer (info)
+  microsoft.scvmm.scvmm_load_balancer_info:
+    address: "nonexistent-lb.test.local"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_lb
+
+- name: Assert empty result
+  ansible.builtin.assert:
+    that:
+      - no_lb.load_balancers | length == 0
+
+# ============================================================
+# Action module - absent idempotency (no LB to remove)
+# ============================================================
+- name: Remove non-existent load balancer (idempotent absent)
+  microsoft.scvmm.scvmm_load_balancer:
+    address: "nonexistent-lb.test.local"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_result
+
+- name: Verify absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_result is not changed
