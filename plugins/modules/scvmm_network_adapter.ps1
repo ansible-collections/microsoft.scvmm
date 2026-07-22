@@ -99,6 +99,7 @@ if ($module.Params.state -eq 'present') {
     }
     else {
         $module.Result.network_adapter = @{
+            id = $null
             vm_name = $module.Params.vm_name
             vm_network = $module.Params.vm_network
         }
