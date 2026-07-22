@@ -38,14 +38,14 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-AdapterResult {
     param($Adapter, $VMName)
     return @{
-        id                = $Adapter.ID.ToString()
-        name              = $Adapter.Name
-        vm_name           = if ($Adapter.VM) { $Adapter.VM.Name } else { $VMName }
-        vm_network        = if ($Adapter.VMNetwork) { $Adapter.VMNetwork.Name } else { $null }
-        mac_address       = $Adapter.MACAddress
-        mac_address_type  = $Adapter.MACAddressType.ToString()
-        ipv4_addresses    = @($Adapter.IPv4Addresses)
-        is_synthetic      = -not $Adapter.IsEmulated
+        id = $Adapter.ID.ToString()
+        name = $Adapter.Name
+        vm_name = if ($Adapter.VM) { $Adapter.VM.Name } else { $VMName }
+        vm_network = if ($Adapter.VMNetwork) { $Adapter.VMNetwork.Name } else { $null }
+        mac_address = $Adapter.MACAddress
+        mac_address_type = $Adapter.MACAddressType.ToString()
+        ipv4_addresses = @($Adapter.IPv4Addresses)
+        is_synthetic = -not $Adapter.IsEmulated
     }
 }
 
@@ -65,8 +65,8 @@ if ($module.Params.state -eq 'present') {
     if (-not $module.CheckMode) {
         try {
             $newParams = @{
-                VM          = $vm
-                Synthetic   = $module.Params.synthetic
+                VM = $vm
+                Synthetic = $module.Params.synthetic
                 ErrorAction = 'Stop'
             }
             if ($module.Params.vm_network) {
@@ -99,7 +99,7 @@ if ($module.Params.state -eq 'present') {
     }
     else {
         $module.Result.network_adapter = @{
-            vm_name    = $module.Params.vm_name
+            vm_name = $module.Params.vm_name
             vm_network = $module.Params.vm_network
         }
         $module.Diff.after = $module.Result.network_adapter
