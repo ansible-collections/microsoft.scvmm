@@ -1,0 +1,17 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_pool_name: "AnsibleTest_MACPool_{{ 99999 | random }}"
+    test_mac_start: "00:1D:D9:AA:00:00"
+    test_mac_end: "00:1D:D9:AA:00:FF"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+  always:
+    - name: Teardown - Remove MAC address pool
+      microsoft.scvmm.scvmm_mac_address_pool:
+        name: "{{ test_pool_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true

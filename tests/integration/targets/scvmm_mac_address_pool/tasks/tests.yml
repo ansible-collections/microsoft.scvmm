@@ -1,0 +1,192 @@
+---
+# ============================================================
+# Create
+# ============================================================
+- name: Create MAC address pool
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    description: "Test MAC address pool"
+    mac_address_range_start: "{{ test_mac_start }}"
+    mac_address_range_end: "{{ test_mac_end }}"
+    host_groups:
+      - All Hosts
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Verify create result
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.mac_address_pool.name == test_pool_name
+      - create_result.mac_address_pool.description == "Test MAC address pool"
+      - create_result.mac_address_pool.mac_address_range_start == test_mac_start
+      - create_result.mac_address_pool.mac_address_range_end == test_mac_end
+
+- name: Verify create with info module
+  microsoft.scvmm.scvmm_mac_address_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_create
+
+- name: Assert info matches create
+  ansible.builtin.assert:
+    that:
+      - info_after_create.mac_address_pools | length == 1
+      - info_after_create.mac_address_pools[0].name == test_pool_name
+      - info_after_create.mac_address_pools[0].description == "Test MAC address pool"
+      - info_after_create.mac_address_pools[0].mac_address_range_start == test_mac_start
+      - info_after_create.mac_address_pools[0].mac_address_range_end == test_mac_end
+      - "'All Hosts' in info_after_create.mac_address_pools[0].host_groups"
+
+- name: Get all MAC address pools (info - no filter)
+  microsoft.scvmm.scvmm_mac_address_pool_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_pools
+
+- name: Assert test pool appears in all pools
+  ansible.builtin.assert:
+    that:
+      - all_pools.mac_address_pools | length >= 1
+      - test_pool_name in (all_pools.mac_address_pools | map(attribute='name') | list)
+
+- name: Query non-existent pool (info)
+  microsoft.scvmm.scvmm_mac_address_pool_info:
+    name: "NonExistent_MACPool_99999"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_pool
+
+- name: Assert empty result for non-existent pool
+  ansible.builtin.assert:
+    that:
+      - no_pool.mac_address_pools | length == 0
+
+# ============================================================
+# Idempotency
+# ============================================================
+- name: Create MAC address pool again (idempotency)
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    description: "Test MAC address pool"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_again
+
+- name: Verify idempotency
+  ansible.builtin.assert:
+    that:
+      - create_again is not changed
+
+# ============================================================
+# Update
+# ============================================================
+- name: Update MAC address pool description
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    description: "Updated MAC pool description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Verify update result
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Verify update with info module
+  microsoft.scvmm.scvmm_mac_address_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_update
+
+- name: Assert info reflects update
+  ansible.builtin.assert:
+    that:
+      - info_after_update.mac_address_pools[0].description == "Updated MAC pool description"
+
+# ============================================================
+# Check mode
+# ============================================================
+- name: Delete MAC address pool (check mode)
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: delete_check
+
+- name: Verify check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - delete_check is changed
+
+- name: Verify pool still exists after check mode
+  microsoft.scvmm.scvmm_mac_address_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_check
+
+- name: Assert pool still exists
+  ansible.builtin.assert:
+    that:
+      - info_after_check.mac_address_pools | length == 1
+
+# ============================================================
+# Delete
+# ============================================================
+- name: Delete MAC address pool
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Verify delete result
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Verify deletion with info module
+  microsoft.scvmm.scvmm_mac_address_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_delete
+
+- name: Assert pool is gone
+  ansible.builtin.assert:
+    that:
+      - info_after_delete.mac_address_pools | length == 0
+
+# ============================================================
+# Absent idempotency
+# ============================================================
+- name: Delete MAC address pool again (idempotency)
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_again
+
+- name: Verify absent idempotency
+  ansible.builtin.assert:
+    that:
+      - delete_again is not changed
+
+# ============================================================
+# Re-create for teardown verification
+# ============================================================
+- name: Re-create MAC address pool for teardown
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    mac_address_range_start: "{{ test_mac_start }}"
+    mac_address_range_end: "{{ test_mac_end }}"
+    host_groups:
+      - All Hosts
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: recreate_result
+
+- name: Verify re-create
+  ansible.builtin.assert:
+    that:
+      - recreate_result is changed
