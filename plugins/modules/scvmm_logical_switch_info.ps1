@@ -29,12 +29,12 @@ if ($module.Params.name) {
 
 $module.Result.logical_switches = @($switches | ForEach-Object {
         @{
-            id                      = $_.ID.ToString()
-            name                    = $_.Name
-            description             = $_.Description
-            minimum_bandwidth_mode  = $_.MinimumBandwidthMode.ToString()
-            enable_sriov            = $_.EnableSriov
-            enable_packet_direct    = $_.EnablePacketDirect
+            id = $_.ID.ToString()
+            name = $_.Name
+            description = $_.Description
+            minimum_bandwidth_mode = $_.MinimumBandwidthMode.ToString()
+            enable_sriov = $_.EnableSriov
+            enable_packet_direct = $_.EnablePacketDirect
         }
     })
 

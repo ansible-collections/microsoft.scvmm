@@ -34,12 +34,12 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-SwitchResult {
     param($Switch)
     return @{
-        id                      = $Switch.ID.ToString()
-        name                    = $Switch.Name
-        description             = $Switch.Description
-        minimum_bandwidth_mode  = $Switch.MinimumBandwidthMode.ToString()
-        enable_sriov            = $Switch.EnableSriov
-        enable_packet_direct    = $Switch.EnablePacketDirect
+        id = $Switch.ID.ToString()
+        name = $Switch.Name
+        description = $Switch.Description
+        minimum_bandwidth_mode = $Switch.MinimumBandwidthMode.ToString()
+        enable_sriov = $Switch.EnableSriov
+        enable_packet_direct = $Switch.EnablePacketDirect
     }
 }
 
@@ -54,8 +54,8 @@ if ($module.Params.state -eq 'present') {
         if (-not $module.CheckMode) {
             try {
                 $newParams = @{
-                    VMMServer   = $vmmConnection
-                    Name        = $module.Params.name
+                    VMMServer = $vmmConnection
+                    Name = $module.Params.name
                     ErrorAction = 'Stop'
                 }
                 if ($null -ne $module.Params.description) {
@@ -122,11 +122,11 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.logical_switch = @{
-            name                    = $module.Params.name
-            description             = $module.Params.description
-            minimum_bandwidth_mode  = $module.Params.minimum_bandwidth_mode
-            enable_sriov            = $module.Params.enable_sriov
-            enable_packet_direct    = $module.Params.enable_packet_direct
+            name = $module.Params.name
+            description = $module.Params.description
+            minimum_bandwidth_mode = $module.Params.minimum_bandwidth_mode
+            enable_sriov = $module.Params.enable_sriov
+            enable_packet_direct = $module.Params.enable_packet_direct
         }
         $module.Diff.after = $module.Result.logical_switch
     }
