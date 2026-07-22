@@ -20,6 +20,12 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "logical_network"; Property = "LogicalNetwork"; Type = "nested_name" }
+)
+
 $getParams = @{
     VMMServer = $vmmConnection
     ErrorAction = 'Stop'
@@ -49,18 +55,14 @@ catch {
 }
 
 $module.Result.logical_network_definitions = @($definitions | ForEach-Object {
-        $result = @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            logical_network = $_.LogicalNetwork.Name
-        }
-        $result.subnet_vlans = @($_.SubnetVLans | ForEach-Object {
+        $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
+        $result['subnet_vlans'] = @($_.SubnetVLans | ForEach-Object {
                 @{
                     subnet = $_.Subnet
                     vlan_id = [int]$_.VLanID
                 }
             })
-        $result.host_groups = @($_.HostGroups | ForEach-Object { $_.Name })
+        $result['host_groups'] = @($_.HostGroups | ForEach-Object { $_.Name })
         $result
     })
 
