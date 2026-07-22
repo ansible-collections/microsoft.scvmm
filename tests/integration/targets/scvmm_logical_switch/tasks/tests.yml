@@ -1,0 +1,186 @@
+---
+# ============================================================
+# Create
+# ============================================================
+- name: Create logical switch
+  microsoft.scvmm.scvmm_logical_switch:
+    name: "{{ test_switch_name }}"
+    description: "Test logical switch"
+    minimum_bandwidth_mode: Weight
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Verify create result
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.logical_switch.name == test_switch_name
+      - create_result.logical_switch.description == "Test logical switch"
+      - create_result.logical_switch.minimum_bandwidth_mode == "Weight"
+      - create_result.logical_switch.enable_sriov == false
+      - create_result.logical_switch.enable_packet_direct == false
+
+- name: Verify create with info module
+  microsoft.scvmm.scvmm_logical_switch_info:
+    name: "{{ test_switch_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_create
+
+- name: Assert info matches create
+  ansible.builtin.assert:
+    that:
+      - info_after_create.logical_switches | length == 1
+      - info_after_create.logical_switches[0].name == test_switch_name
+      - info_after_create.logical_switches[0].description == "Test logical switch"
+      - info_after_create.logical_switches[0].minimum_bandwidth_mode == "Weight"
+
+- name: Get all logical switches (info - no filter)
+  microsoft.scvmm.scvmm_logical_switch_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_switches
+
+- name: Assert test switch in all switches
+  ansible.builtin.assert:
+    that:
+      - all_switches.logical_switches | length >= 1
+      - test_switch_name in (all_switches.logical_switches | map(attribute='name') | list)
+
+- name: Query non-existent switch (info)
+  microsoft.scvmm.scvmm_logical_switch_info:
+    name: "NonExistent_LogSwitch_99999"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_switch
+
+- name: Assert empty result
+  ansible.builtin.assert:
+    that:
+      - no_switch.logical_switches | length == 0
+
+# ============================================================
+# Idempotency
+# ============================================================
+- name: Create logical switch again (idempotency)
+  microsoft.scvmm.scvmm_logical_switch:
+    name: "{{ test_switch_name }}"
+    description: "Test logical switch"
+    minimum_bandwidth_mode: Weight
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_again
+
+- name: Verify idempotency
+  ansible.builtin.assert:
+    that:
+      - create_again is not changed
+
+# ============================================================
+# Update
+# ============================================================
+- name: Update logical switch description
+  microsoft.scvmm.scvmm_logical_switch:
+    name: "{{ test_switch_name }}"
+    description: "Updated logical switch"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Verify update result
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Verify update with info module
+  microsoft.scvmm.scvmm_logical_switch_info:
+    name: "{{ test_switch_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_update
+
+- name: Assert info reflects update
+  ansible.builtin.assert:
+    that:
+      - info_after_update.logical_switches[0].description == "Updated logical switch"
+
+# ============================================================
+# Check mode
+# ============================================================
+- name: Delete logical switch (check mode)
+  microsoft.scvmm.scvmm_logical_switch:
+    name: "{{ test_switch_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: delete_check
+
+- name: Verify check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - delete_check is changed
+
+- name: Verify switch still exists after check mode
+  microsoft.scvmm.scvmm_logical_switch_info:
+    name: "{{ test_switch_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_check
+
+- name: Assert switch still exists
+  ansible.builtin.assert:
+    that:
+      - info_after_check.logical_switches | length == 1
+
+# ============================================================
+# Delete
+# ============================================================
+- name: Delete logical switch
+  microsoft.scvmm.scvmm_logical_switch:
+    name: "{{ test_switch_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Verify delete result
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Verify deletion with info module
+  microsoft.scvmm.scvmm_logical_switch_info:
+    name: "{{ test_switch_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_delete
+
+- name: Assert switch is gone
+  ansible.builtin.assert:
+    that:
+      - info_after_delete.logical_switches | length == 0
+
+# ============================================================
+# Absent idempotency
+# ============================================================
+- name: Delete logical switch again (idempotency)
+  microsoft.scvmm.scvmm_logical_switch:
+    name: "{{ test_switch_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_again
+
+- name: Verify absent idempotency
+  ansible.builtin.assert:
+    that:
+      - delete_again is not changed
+
+# ============================================================
+# Re-create for teardown verification
+# ============================================================
+- name: Re-create logical switch for teardown
+  microsoft.scvmm.scvmm_logical_switch:
+    name: "{{ test_switch_name }}"
+    minimum_bandwidth_mode: Weight
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: recreate_result
+
+- name: Verify re-create
+  ansible.builtin.assert:
+    that:
+      - recreate_result is changed
