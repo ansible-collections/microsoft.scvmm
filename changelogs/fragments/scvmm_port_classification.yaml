@@ -1,4 +1,0 @@
----
-minor_changes:
-  - scvmm_port_classification - Manage port classifications in SCVMM.
-  - scvmm_port_classification_info - Query port classifications in SCVMM.

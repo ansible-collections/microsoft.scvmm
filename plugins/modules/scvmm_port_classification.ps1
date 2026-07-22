@@ -54,19 +54,31 @@ if ($module.Params.state -eq 'present') {
             }
             try {
                 $classification = New-SCPortClassification @newParams
+                $module.Result.port_classification = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $classification
+                $module.Diff.after = $module.Result.port_classification
             }
             catch {
                 $module.FailJson("Failed to create port classification '$($module.Params.name)': $($_.Exception.Message)", $_)
             }
         }
+        else {
+            $module.Result.port_classification = @{
+                id = $null
+                name = $module.Params.name
+                description = $module.Params.description
+            }
+            $module.Diff.after = $module.Result.port_classification
+        }
     }
     else {
+        $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $classification
+
         $updateParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
             -AnsibleParams $module.Params -CurrentObject $classification
         $needsUpdate = $updateParams.Count -gt 0
 
         if ($needsUpdate) {
-            $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $classification
+            $module.Result.changed = $true
             if (-not $module.CheckMode) {
                 $updateParams['PortClassification'] = $classification
                 $updateParams['ErrorAction'] = 'Stop'
@@ -77,29 +89,16 @@ if ($module.Params.state -eq 'present') {
                     $module.FailJson("Failed to update port classification '$($module.Params.name)': $($_.Exception.Message)", $_)
                 }
             }
-            $module.Result.changed = $true
         }
-    }
 
-    if ($classification) {
         $module.Result.port_classification = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $classification
-        if ($module.Result.changed -and $module.Diff.before) {
-            if ($module.CheckMode) {
-                $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
-                    -UpdateMap $updateMap -AnsibleParams $module.Params -CurrentObject $classification
-            }
-            else {
-                $module.Diff.after = $module.Result.port_classification
-            }
+        if ($needsUpdate -and $module.CheckMode) {
+            $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                -UpdateMap $updateMap -AnsibleParams $module.Params -CurrentObject $classification
         }
-    }
-    elseif ($module.CheckMode) {
-        $module.Result.port_classification = @{
-            id = $null
-            name = $module.Params.name
-            description = $module.Params.description
+        else {
+            $module.Diff.after = $module.Result.port_classification
         }
-        $module.Diff.after = $module.Result.port_classification
     }
 }
 else {
