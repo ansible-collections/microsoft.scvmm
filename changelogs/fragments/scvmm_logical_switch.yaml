@@ -1,4 +1,0 @@
----
-minor_changes:
-  - scvmm_logical_switch - Manage logical switches in SCVMM.
-  - scvmm_logical_switch_info - Query logical switches in SCVMM.

@@ -31,17 +31,21 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
-function Get-SwitchResult {
-    param($Switch)
-    return @{
-        id = $Switch.ID.ToString()
-        name = $Switch.Name
-        description = $Switch.Description
-        minimum_bandwidth_mode = $Switch.MinimumBandwidthMode.ToString()
-        enable_sriov = $Switch.EnableSriov
-        enable_packet_direct = $Switch.EnablePacketDirect
-    }
-}
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "minimum_bandwidth_mode"; Property = "MinimumBandwidthMode"; Type = "enum" }
+    @{ Param = "enable_sriov"; Property = "EnableSriov"; Type = "bool" }
+    @{ Param = "enable_packet_direct"; Property = "EnablePacketDirect"; Type = "bool" }
+)
+
+$updateMap = @(
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "minimum_bandwidth_mode"; Property = "MinimumBandwidthMode"; Type = "enum" }
+    @{ Param = "enable_sriov"; Property = "EnableSriov"; Type = "bool" }
+    @{ Param = "enable_packet_direct"; Property = "EnablePacketDirect"; Type = "bool" }
+)
 
 $logicalSwitch = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
     -CmdletName 'Get-SCLogicalSwitch' -Name $module.Params.name `
@@ -58,83 +62,66 @@ if ($module.Params.state -eq 'present') {
                     Name = $module.Params.name
                     ErrorAction = 'Stop'
                 }
-                if ($null -ne $module.Params.description) {
-                    $newParams['Description'] = $module.Params.description
-                }
-                if ($null -ne $module.Params.minimum_bandwidth_mode) {
-                    $newParams['MinimumBandwidthMode'] = $module.Params.minimum_bandwidth_mode
-                }
-                if ($null -ne $module.Params.enable_sriov) {
-                    $newParams['EnableSriov'] = $module.Params.enable_sriov
-                }
-                if ($null -ne $module.Params.enable_packet_direct) {
-                    $newParams['EnablePacketDirect'] = $module.Params.enable_packet_direct
+                $createParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap -AnsibleParams $module.Params
+                foreach ($key in $createParams.Keys) {
+                    $newParams[$key] = $createParams[$key]
                 }
                 $logicalSwitch = New-SCLogicalSwitch @newParams
+                $module.Result.logical_switch = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalSwitch
+                $module.Diff.after = $module.Result.logical_switch
             }
             catch {
                 $module.FailJson("Failed to create logical switch '$($module.Params.name)': $($_.Exception.Message)", $_)
             }
         }
+        else {
+            $module.Result.logical_switch = @{
+                id = $null
+                name = $module.Params.name
+                description = $module.Params.description
+                minimum_bandwidth_mode = $module.Params.minimum_bandwidth_mode
+                enable_sriov = $module.Params.enable_sriov
+                enable_packet_direct = $module.Params.enable_packet_direct
+            }
+            $module.Diff.after = $module.Result.logical_switch
+        }
     }
     else {
-        $needsUpdate = $false
-        $updateParams = @{}
+        $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalSwitch
 
-        if ($null -ne $module.Params.description -and $module.Params.description -ne $logicalSwitch.Description) {
-            $needsUpdate = $true
-            $updateParams['Description'] = $module.Params.description
-        }
-        if ($null -ne $module.Params.minimum_bandwidth_mode -and $module.Params.minimum_bandwidth_mode -ne $logicalSwitch.MinimumBandwidthMode.ToString()) {
-            $needsUpdate = $true
-            $updateParams['MinimumBandwidthMode'] = $module.Params.minimum_bandwidth_mode
-        }
-        if ($null -ne $module.Params.enable_sriov -and $module.Params.enable_sriov -ne $logicalSwitch.EnableSriov) {
-            $needsUpdate = $true
-            $updateParams['EnableSriov'] = $module.Params.enable_sriov
-        }
-        if ($null -ne $module.Params.enable_packet_direct -and $module.Params.enable_packet_direct -ne $logicalSwitch.EnablePacketDirect) {
-            $needsUpdate = $true
-            $updateParams['EnablePacketDirect'] = $module.Params.enable_packet_direct
-        }
+        $needsUpdate = Test-SCVMMPropertiesChanged -PropertyMap $updateMap `
+            -CurrentObject $logicalSwitch -AnsibleParams $module.Params
 
         if ($needsUpdate) {
-            $module.Diff.before = Get-SwitchResult -Switch $logicalSwitch
+            $setParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
+                -AnsibleParams $module.Params -CurrentObject $logicalSwitch
             $module.Result.changed = $true
             if (-not $module.CheckMode) {
-                $updateParams['LogicalSwitch'] = $logicalSwitch
-                $updateParams['ErrorAction'] = 'Stop'
+                $setParams['LogicalSwitch'] = $logicalSwitch
+                $setParams['ErrorAction'] = 'Stop'
                 try {
-                    $logicalSwitch = Set-SCLogicalSwitch @updateParams
+                    $logicalSwitch = Set-SCLogicalSwitch @setParams
                 }
                 catch {
                     $module.FailJson("Failed to update logical switch '$($module.Params.name)': $($_.Exception.Message)", $_)
                 }
             }
         }
-    }
 
-    if ($logicalSwitch) {
-        $module.Result.logical_switch = Get-SwitchResult -Switch $logicalSwitch
-        if ($module.Result.changed -and $module.Diff.before) {
+        $module.Result.logical_switch = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalSwitch
+        if ($needsUpdate -and $module.CheckMode) {
+            $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+                -UpdateMap $updateMap -AnsibleParams $module.Params `
+                -CurrentObject $logicalSwitch
+        }
+        else {
             $module.Diff.after = $module.Result.logical_switch
         }
-    }
-    elseif ($module.CheckMode) {
-        $module.Result.logical_switch = @{
-            id = $null
-            name = $module.Params.name
-            description = $module.Params.description
-            minimum_bandwidth_mode = $module.Params.minimum_bandwidth_mode
-            enable_sriov = $module.Params.enable_sriov
-            enable_packet_direct = $module.Params.enable_packet_direct
-        }
-        $module.Diff.after = $module.Result.logical_switch
     }
 }
 else {
     if ($logicalSwitch) {
-        $module.Diff.before = Get-SwitchResult -Switch $logicalSwitch
+        $module.Diff.before = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $logicalSwitch
         $module.Diff.after = @{}
         $module.Result.changed = $true
         if (-not $module.CheckMode) {

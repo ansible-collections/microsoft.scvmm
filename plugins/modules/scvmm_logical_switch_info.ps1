@@ -19,6 +19,15 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "minimum_bandwidth_mode"; Property = "MinimumBandwidthMode"; Type = "enum" }
+    @{ Param = "enable_sriov"; Property = "EnableSriov"; Type = "bool" }
+    @{ Param = "enable_packet_direct"; Property = "EnablePacketDirect"; Type = "bool" }
+)
+
 $switches = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
     -CmdletName 'Get-SCLogicalSwitch' -Name $module.Params.name `
     -ObjectType 'logical switch'
@@ -28,14 +37,7 @@ if ($module.Params.name) {
 }
 
 $module.Result.logical_switches = @($switches | ForEach-Object {
-        @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            description = $_.Description
-            minimum_bandwidth_mode = $_.MinimumBandwidthMode.ToString()
-            enable_sriov = $_.EnableSriov
-            enable_packet_direct = $_.EnablePacketDirect
-        }
+        Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
     })
 
 $module.ExitJson()
