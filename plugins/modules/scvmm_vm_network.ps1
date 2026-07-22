@@ -36,11 +36,11 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-VMNetworkResult {
     param($VMNetwork)
     return @{
-        id               = $VMNetwork.ID.ToString()
-        name             = $VMNetwork.Name
-        description      = $VMNetwork.Description
-        logical_network  = $VMNetwork.LogicalNetwork.Name
-        isolation_type   = [string]$VMNetwork.IsolationType
+        id = $VMNetwork.ID.ToString()
+        name = $VMNetwork.Name
+        description = $VMNetwork.Description
+        logical_network = $VMNetwork.LogicalNetwork.Name
+        isolation_type = [string]$VMNetwork.IsolationType
     }
 }
 
@@ -60,9 +60,9 @@ if ($module.Params.state -eq 'present') {
                 }
 
                 $newParams = @{
-                    Name           = $module.Params.name
+                    Name = $module.Params.name
                     LogicalNetwork = $logicalNetwork
-                    ErrorAction    = 'Stop'
+                    ErrorAction = 'Stop'
                 }
                 if ($null -ne $module.Params.description) {
                     $newParams['Description'] = $module.Params.description
@@ -110,8 +110,8 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.vm_network = @{
-            name            = $module.Params.name
-            description     = $module.Params.description
+            name = $module.Params.name
+            description = $module.Params.description
             logical_network = $module.Params.logical_network
         }
         $module.Diff.after = $module.Result.vm_network

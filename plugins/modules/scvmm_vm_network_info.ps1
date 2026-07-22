@@ -21,7 +21,7 @@ $module.Result.changed = $false
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
 $getParams = @{
-    VMMServer   = $vmmConnection
+    VMMServer = $vmmConnection
     ErrorAction = 'Stop'
 }
 
@@ -54,11 +54,11 @@ if ($module.Params.name) {
 
 $module.Result.vm_networks = @($vmNetworks | ForEach-Object {
         @{
-            id              = $_.ID.ToString()
-            name            = $_.Name
-            description     = $_.Description
+            id = $_.ID.ToString()
+            name = $_.Name
+            description = $_.Description
             logical_network = $_.LogicalNetwork.Name
-            isolation_type  = [string]$_.IsolationType
+            isolation_type = [string]$_.IsolationType
         }
     })
 
