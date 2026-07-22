@@ -40,20 +40,22 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "logical_network"; Property = "LogicalNetwork"; Type = "nested_name" }
+)
+
 function Get-DefinitionResult {
     param($Definition)
-    $result = @{
-        id = $Definition.ID.ToString()
-        name = $Definition.Name
-        logical_network = $Definition.LogicalNetwork.Name
-    }
-    $result.subnet_vlans = @($Definition.SubnetVLans | ForEach-Object {
+    $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $Definition
+    $result['subnet_vlans'] = @($Definition.SubnetVLans | ForEach-Object {
             @{
                 subnet = $_.Subnet
                 vlan_id = [int]$_.VLanID
             }
         })
-    $result.host_groups = @($Definition.HostGroups | ForEach-Object { $_.Name })
+    $result['host_groups'] = @($Definition.HostGroups | ForEach-Object { $_.Name })
     return $result
 }
 
@@ -99,21 +101,44 @@ if ($module.Params.state -eq 'present') {
                     ErrorAction = 'Stop'
                 }
                 $definition = New-SCLogicalNetworkDefinition @newParams
+                $module.Result.logical_network_definition = Get-DefinitionResult -Definition $definition
+                $module.Diff.after = $module.Result.logical_network_definition
             }
             catch {
                 $module.FailJson("Failed to create logical network definition '$($module.Params.name)': $($_.Exception.Message)", $_)
             }
         }
+        else {
+            $module.Result.logical_network_definition = @{
+                id = $null
+                name = $module.Params.name
+                logical_network = $module.Params.logical_network
+                subnet_vlans = @($module.Params.subnet_vlans | ForEach-Object {
+                        @{ subnet = $_.subnet; vlan_id = $_.vlan_id }
+                    })
+                host_groups = if ($module.Params.host_groups) { @($module.Params.host_groups) } else { @() }
+            }
+            $module.Diff.after = $module.Result.logical_network_definition
+        }
     }
     else {
+        $module.Diff.before = Get-DefinitionResult -Definition $definition
+
         $needsUpdate = $false
         $updateParams = @{}
 
         if ($null -ne $module.Params.subnet_vlans) {
             $currentSubnets = @($definition.SubnetVLans | ForEach-Object { "$($_.Subnet):$($_.VLanID)" }) | Sort-Object
             $desiredSubnets = @($module.Params.subnet_vlans | ForEach-Object { "$($_.subnet):$($_.vlan_id)" }) | Sort-Object
-            $diff = Compare-Object -ReferenceObject $currentSubnets -DifferenceObject $desiredSubnets -ErrorAction SilentlyContinue
-            if ($diff) {
+            $subnetsDiffer = $false
+            if ($currentSubnets.Count -ne $desiredSubnets.Count) {
+                $subnetsDiffer = $true
+            }
+            elseif ($currentSubnets.Count -gt 0) {
+                $diff = Compare-Object -ReferenceObject $currentSubnets -DifferenceObject $desiredSubnets -ErrorAction SilentlyContinue
+                $subnetsDiffer = [bool]$diff
+            }
+            if ($subnetsDiffer) {
                 $needsUpdate = $true
                 $updateParams['SubnetVLan'] = @($module.Params.subnet_vlans | ForEach-Object {
                         New-SCSubnetVLan -Subnet $_.subnet -VLanID $_.vlan_id
@@ -121,14 +146,26 @@ if ($module.Params.state -eq 'present') {
             }
         }
 
+        $toAdd = @()
+        $toRemove = @()
         if ($null -ne $module.Params.host_groups) {
             $currentGroups = @($definition.HostGroups | ForEach-Object { $_.Name }) | Sort-Object
             $desiredGroups = @($module.Params.host_groups) | Sort-Object
-            $diff = Compare-Object -ReferenceObject $currentGroups -DifferenceObject $desiredGroups -ErrorAction SilentlyContinue
-            if ($diff) {
+            if ($currentGroups.Count -eq 0 -and $desiredGroups.Count -gt 0) {
+                $toAdd = $desiredGroups
+            }
+            elseif ($currentGroups.Count -gt 0 -and $desiredGroups.Count -eq 0) {
+                $toRemove = $currentGroups
+            }
+            elseif ($currentGroups.Count -gt 0 -and $desiredGroups.Count -gt 0) {
+                $diff = Compare-Object -ReferenceObject $currentGroups -DifferenceObject $desiredGroups -ErrorAction SilentlyContinue
+                if ($diff) {
+                    $toAdd = @($desiredGroups | Where-Object { $_ -notin $currentGroups })
+                    $toRemove = @($currentGroups | Where-Object { $_ -notin $desiredGroups })
+                }
+            }
+            if ($toAdd.Count -gt 0 -or $toRemove.Count -gt 0) {
                 $needsUpdate = $true
-                $toAdd = @($desiredGroups | Where-Object { $_ -notin $currentGroups })
-                $toRemove = @($currentGroups | Where-Object { $_ -notin $desiredGroups })
                 if ($toAdd.Count -gt 0) {
                     $updateParams['AddVMHostGroup'] = @($toAdd | ForEach-Object {
                             Get-SCVMHostGroup -VMMServer $vmmConnection -Name $_ -ErrorAction Stop
@@ -143,7 +180,6 @@ if ($module.Params.state -eq 'present') {
         }
 
         if ($needsUpdate) {
-            $module.Diff.before = Get-DefinitionResult -Definition $definition
             $module.Result.changed = $true
             if (-not $module.CheckMode) {
                 $updateParams['LogicalNetworkDefinition'] = $definition
@@ -156,21 +192,23 @@ if ($module.Params.state -eq 'present') {
                 }
             }
         }
-    }
 
-    if ($definition) {
         $module.Result.logical_network_definition = Get-DefinitionResult -Definition $definition
-        if ($module.Result.changed -and $module.Diff.before) {
+        if ($needsUpdate -and $module.CheckMode) {
+            $projected = $module.Diff.before.Clone()
+            if ($null -ne $module.Params.subnet_vlans) {
+                $projected['subnet_vlans'] = @($module.Params.subnet_vlans | ForEach-Object {
+                        @{ subnet = $_.subnet; vlan_id = $_.vlan_id }
+                    })
+            }
+            if ($null -ne $module.Params.host_groups) {
+                $projected['host_groups'] = @($module.Params.host_groups)
+            }
+            $module.Diff.after = $projected
+        }
+        else {
             $module.Diff.after = $module.Result.logical_network_definition
         }
-    }
-    elseif ($module.CheckMode) {
-        $module.Result.logical_network_definition = @{
-            id = $null
-            name = $module.Params.name
-            logical_network = $module.Params.logical_network
-        }
-        $module.Diff.after = $module.Result.logical_network_definition
     }
 }
 else {
