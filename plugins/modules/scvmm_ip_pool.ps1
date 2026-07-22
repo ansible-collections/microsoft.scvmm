@@ -170,6 +170,7 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.ip_pool = @{
+            id = $null
             name = $module.Params.name
             description = $module.Params.description
             subnet = $module.Params.subnet
