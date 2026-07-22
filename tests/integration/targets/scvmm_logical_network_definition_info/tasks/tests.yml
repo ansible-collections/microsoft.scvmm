@@ -1,0 +1,74 @@
+---
+# ── Query by name ──
+- name: Get definition by name
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    name: "{{ test_def_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected results
+  ansible.builtin.assert:
+    that:
+      - by_name is not changed
+      - by_name.logical_network_definitions | length == 1
+      - by_name.logical_network_definitions[0].name == test_def_name
+      - by_name.logical_network_definitions[0].logical_network == test_ln_name
+      - by_name.logical_network_definitions[0].id is defined
+      - by_name.logical_network_definitions[0].id | length > 0
+      - by_name.logical_network_definitions[0].subnet_vlans is defined
+      - by_name.logical_network_definitions[0].subnet_vlans | length == 1
+      - by_name.logical_network_definitions[0].host_groups is defined
+      - by_name.logical_network_definitions[0].host_groups | length >= 1
+
+# ── Query by logical network ──
+- name: Get definitions by logical network
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    logical_network: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_ln
+
+- name: Assert query by logical network returns test definition
+  ansible.builtin.assert:
+    that:
+      - by_ln is not changed
+      - by_ln.logical_network_definitions | length >= 1
+      - test_def_name in (by_ln.logical_network_definitions | map(attribute='name') | list)
+
+# ── Query all ──
+- name: Get all definitions
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_defs
+
+- name: Assert test definition appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_defs is not changed
+      - all_defs.logical_network_definitions | length > 0
+      - test_def_name in (all_defs.logical_network_definitions | map(attribute='name') | list)
+
+# ── Query non-existent ──
+- name: Query non-existent definition
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    name: "NonExistent_Def_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent is not changed
+      - non_existent.logical_network_definitions | length == 0
+
+# ── Stability ──
+- name: Query same definition again
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    name: "{{ test_def_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns consistent results
+  ansible.builtin.assert:
+    that:
+      - second_query.logical_network_definitions | length == 1
+      - second_query.logical_network_definitions[0].id == by_name.logical_network_definitions[0].id
