@@ -19,6 +19,14 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "vm_network"; Property = "VMNetwork"; Type = "nested_name" }
+    @{ Param = "mac_address"; Property = "MACAddress"; Type = "string" }
+    @{ Param = "mac_address_type"; Property = "MACAddressType"; Type = "enum" }
+)
+
 $vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $module.Params.vm_name -ErrorAction SilentlyContinue
 if (-not $vm) {
     $module.Result.network_adapters = @()
@@ -28,16 +36,11 @@ if (-not $vm) {
 $adapters = @(Get-SCVirtualNetworkAdapter -VM $vm -ErrorAction Stop)
 
 $module.Result.network_adapters = @($adapters | ForEach-Object {
-        @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            vm_name = if ($_.VM) { $_.VM.Name } else { $module.Params.vm_name }
-            vm_network = if ($_.VMNetwork) { $_.VMNetwork.Name } else { $null }
-            mac_address = $_.MACAddress
-            mac_address_type = $_.MACAddressType.ToString()
-            ipv4_addresses = @($_.IPv4Addresses)
-            is_synthetic = -not $_.IsEmulated
-        }
+        $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
+        $result['vm_name'] = if ($_.VM) { $_.VM.Name } else { $module.Params.vm_name }
+        $result['ipv4_addresses'] = @($_.IPv4Addresses)
+        $result['is_synthetic'] = -not $_.IsEmulated
+        $result
     })
 
 $module.ExitJson()

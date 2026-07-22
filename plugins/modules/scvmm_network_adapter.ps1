@@ -35,21 +35,24 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "vm_network"; Property = "VMNetwork"; Type = "nested_name" }
+    @{ Param = "mac_address"; Property = "MACAddress"; Type = "string" }
+    @{ Param = "mac_address_type"; Property = "MACAddressType"; Type = "enum" }
+)
+
 function Get-AdapterResult {
     param($Adapter, $VMName)
-    return @{
-        id = $Adapter.ID.ToString()
-        name = $Adapter.Name
-        vm_name = if ($Adapter.VM) { $Adapter.VM.Name } else { $VMName }
-        vm_network = if ($Adapter.VMNetwork) { $Adapter.VMNetwork.Name } else { $null }
-        mac_address = $Adapter.MACAddress
-        mac_address_type = $Adapter.MACAddressType.ToString()
-        ipv4_addresses = @($Adapter.IPv4Addresses)
-        is_synthetic = -not $Adapter.IsEmulated
-    }
+    $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $Adapter
+    $result['vm_name'] = if ($Adapter.VM) { $Adapter.VM.Name } else { $VMName }
+    $result['ipv4_addresses'] = @($Adapter.IPv4Addresses)
+    $result['is_synthetic'] = -not $Adapter.IsEmulated
+    return $result
 }
 
-$vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $module.Params.vm_name -ErrorAction SilentlyContinue
+$vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $module.Params.vm_name
 if (-not $vm) {
     if ($module.Params.state -eq 'absent') {
         $module.ExitJson()
@@ -59,56 +62,78 @@ if (-not $vm) {
 
 $adapters = @(Get-SCVirtualNetworkAdapter -VM $vm -ErrorAction Stop)
 
-if ($module.Params.state -eq 'present') {
-    $module.Diff.before = @{}
-    $module.Result.changed = $true
-    if (-not $module.CheckMode) {
-        try {
-            $newParams = @{
-                VM = $vm
-                Synthetic = $module.Params.synthetic
-                ErrorAction = 'Stop'
-            }
-            if ($module.Params.vm_network) {
-                $vmNet = Get-SCVMNetwork -VMMServer $vmmConnection -Name $module.Params.vm_network -ErrorAction Stop
-                if (-not $vmNet) {
-                    $module.FailJson("VM network '$($module.Params.vm_network)' not found")
-                }
-                $newParams['VMNetwork'] = $vmNet
-            }
-            else {
-                $newParams['NoConnection'] = $true
-            }
-            if ($null -ne $module.Params.mac_address_type) {
-                $newParams['MACAddressType'] = $module.Params.mac_address_type
-            }
-            if ($null -ne $module.Params.mac_address) {
-                $newParams['MACAddress'] = $module.Params.mac_address
-            }
-            if ($null -ne $module.Params.ipv4_address_type) {
-                $newParams['IPv4AddressType'] = $module.Params.ipv4_address_type
-            }
+$existingAdapter = $null
+if ($module.Params.vm_network) {
+    $existingAdapter = $adapters | Where-Object {
+        $_.VMNetwork -and $_.VMNetwork.Name -eq $module.Params.vm_network
+    } | Select-Object -First 1
+}
 
-            $adapter = New-SCVirtualNetworkAdapter @newParams
-            $module.Result.network_adapter = Get-AdapterResult -Adapter $adapter -VMName $module.Params.vm_name
-            $module.Diff.after = $module.Result.network_adapter
+if ($module.Params.state -eq 'present') {
+    if ($null -eq $existingAdapter) {
+        $module.Diff.before = @{}
+        $module.Result.changed = $true
+        if (-not $module.CheckMode) {
+            try {
+                $newParams = @{
+                    VM = $vm
+                    Synthetic = $module.Params.synthetic
+                    ErrorAction = 'Stop'
+                }
+                if ($module.Params.vm_network) {
+                    $vmNet = Get-SCVMNetwork -VMMServer $vmmConnection -Name $module.Params.vm_network -ErrorAction Stop
+                    if (-not $vmNet) {
+                        $module.FailJson("VM network '$($module.Params.vm_network)' not found")
+                    }
+                    $newParams['VMNetwork'] = $vmNet
+                }
+                else {
+                    $newParams['NoConnection'] = $true
+                }
+                if ($null -ne $module.Params.mac_address_type) {
+                    $newParams['MACAddressType'] = $module.Params.mac_address_type
+                }
+                if ($null -ne $module.Params.mac_address) {
+                    $newParams['MACAddress'] = $module.Params.mac_address
+                }
+                if ($null -ne $module.Params.ipv4_address_type) {
+                    $newParams['IPv4AddressType'] = $module.Params.ipv4_address_type
+                }
+
+                $adapter = New-SCVirtualNetworkAdapter @newParams
+                $module.Result.network_adapter = Get-AdapterResult -Adapter $adapter -VMName $module.Params.vm_name
+                $module.Diff.after = $module.Result.network_adapter
+            }
+            catch {
+                $module.FailJson("Failed to add network adapter to VM '$($module.Params.vm_name)': $($_.Exception.Message)", $_)
+            }
         }
-        catch {
-            $module.FailJson("Failed to add network adapter to VM '$($module.Params.vm_name)': $($_.Exception.Message)", $_)
+        else {
+            $module.Result.network_adapter = @{
+                id = $null
+                name = $null
+                vm_name = $module.Params.vm_name
+                vm_network = $module.Params.vm_network
+                mac_address = $module.Params.mac_address
+                mac_address_type = $module.Params.mac_address_type
+                ipv4_addresses = @()
+                is_synthetic = $module.Params.synthetic
+            }
+            $module.Diff.after = $module.Result.network_adapter
         }
     }
     else {
-        $module.Result.network_adapter = @{
-            id = $null
-            vm_name = $module.Params.vm_name
-            vm_network = $module.Params.vm_network
-        }
-        $module.Diff.after = $module.Result.network_adapter
+        $module.Result.network_adapter = Get-AdapterResult -Adapter $existingAdapter -VMName $module.Params.vm_name
     }
 }
 else {
-    if ($adapters.Count -gt 0) {
-        $targetAdapter = $adapters[-1]
+    if ($module.Params.vm_network) {
+        $targetAdapter = $existingAdapter
+    }
+    else {
+        $targetAdapter = $adapters | Select-Object -Last 1
+    }
+    if ($targetAdapter) {
         $module.Diff.before = Get-AdapterResult -Adapter $targetAdapter -VMName $module.Params.vm_name
         $module.Diff.after = @{}
         $module.Result.changed = $true
