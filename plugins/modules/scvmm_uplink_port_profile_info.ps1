@@ -19,6 +19,13 @@ $module.Result.changed = $false
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "enable_network_virtualization"; Property = "EnableNetworkVirtualization"; Type = "bool" }
+)
+
 $profiles = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
     -CmdletName 'Get-SCNativeUplinkPortProfile' -Name $module.Params.name `
     -ObjectType 'uplink port profile'
@@ -28,13 +35,8 @@ if ($module.Params.name) {
 }
 
 $module.Result.uplink_port_profiles = @($profiles | ForEach-Object {
-        $result = @{
-            id = $_.ID.ToString()
-            name = $_.Name
-            description = $_.Description
-            enable_network_virtualization = [bool]$_.EnableNetworkVirtualization
-        }
-        $result.logical_network_definitions = @($_.LogicalNetworkDefinitions | ForEach-Object { $_.Name })
+        $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
+        $result['logical_network_definitions'] = @($_.LogicalNetworkDefinitions | ForEach-Object { $_.Name })
         $result
     })
 
