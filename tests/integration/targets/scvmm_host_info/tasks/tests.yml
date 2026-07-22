@@ -1,0 +1,60 @@
+---
+# ── Query by name ──
+- name: Get host by name
+  microsoft.scvmm.scvmm_host_info:
+    name: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected data
+  assert:
+    that:
+      - by_name is not changed
+      - by_name.hosts | length == 1
+      - by_name.hosts[0].name == test_host_name
+      - by_name.hosts[0].id is defined
+      - by_name.hosts[0].id | length > 0
+      - by_name.hosts[0].host_group is defined
+      - by_name.hosts[0].status is defined
+      - by_name.hosts[0].cpu_count is defined
+      - by_name.hosts[0].total_memory_gb is defined
+      - by_name.hosts[0].os_version is defined
+      - by_name.hosts[0].vm_count is defined
+
+# ── Query all ──
+- name: Get all hosts
+  microsoft.scvmm.scvmm_host_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_hosts
+
+- name: Assert test host appears in all hosts
+  assert:
+    that:
+      - all_hosts.hosts | length > 0
+      - test_host_name in (all_hosts.hosts | map(attribute='name') | list)
+
+# ── Query by host group ──
+- name: Get hosts by host group
+  microsoft.scvmm.scvmm_host_info:
+    host_group: "All Hosts"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_group
+
+- name: Assert host group query returns hosts
+  assert:
+    that:
+      - by_group.hosts | length > 0
+
+# ── Stability ──
+- name: Query same host again
+  microsoft.scvmm.scvmm_host_info:
+    name: "{{ test_host_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns same data
+  assert:
+    that:
+      - second_query.hosts[0].id == by_name.hosts[0].id
+      - second_query.hosts[0].name == by_name.hosts[0].name
+      - second_query.hosts[0].host_group == by_name.hosts[0].host_group
