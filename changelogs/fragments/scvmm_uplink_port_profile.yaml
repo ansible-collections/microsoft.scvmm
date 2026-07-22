@@ -1,0 +1,4 @@
+---
+minor_changes:
+  - scvmm_uplink_port_profile - Manage uplink port profiles in SCVMM.
+  - scvmm_uplink_port_profile_info - Query uplink port profiles in SCVMM.

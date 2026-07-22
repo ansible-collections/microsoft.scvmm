@@ -33,28 +33,28 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-ProfileResult {
     param($Profile)
     $result = @{
-        id                           = $Profile.ID.ToString()
-        name                         = $Profile.Name
-        description                  = $Profile.Description
+        id = $Profile.ID.ToString()
+        name = $Profile.Name
+        description = $Profile.Description
         enable_network_virtualization = [bool]$Profile.EnableNetworkVirtualization
     }
     $result.logical_network_definitions = @($Profile.LogicalNetworkDefinitions | ForEach-Object { $_.Name })
     return $result
 }
 
-$profile = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+$uplinkProfile = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
     -CmdletName 'Get-SCNativeUplinkPortProfile' -Name $module.Params.name `
     -ObjectType 'uplink port profile'
 
 if ($module.Params.state -eq 'present') {
-    if (-not $profile) {
+    if (-not $uplinkProfile) {
         $module.Diff.before = @{}
         $module.Result.changed = $true
         if (-not $module.CheckMode) {
             try {
                 $newParams = @{
-                    Name        = $module.Params.name
-                    VMMServer   = $vmmConnection
+                    Name = $module.Params.name
+                    VMMServer = $vmmConnection
                     ErrorAction = 'Stop'
                 }
                 if ($null -ne $module.Params.description) {
@@ -73,7 +73,7 @@ if ($module.Params.state -eq 'present') {
                         })
                     $newParams['LogicalNetworkDefinition'] = $lnDefs
                 }
-                $profile = New-SCNativeUplinkPortProfile @newParams
+                $uplinkProfile = New-SCNativeUplinkPortProfile @newParams
             }
             catch {
                 $module.FailJson("Failed to create uplink port profile '$($module.Params.name)': $($_.Exception.Message)", $_)
@@ -84,19 +84,19 @@ if ($module.Params.state -eq 'present') {
         $needsUpdate = $false
         $updateParams = @{}
 
-        if ($null -ne $module.Params.description -and $module.Params.description -ne $profile.Description) {
+        if ($null -ne $module.Params.description -and $module.Params.description -ne $uplinkProfile.Description) {
             $needsUpdate = $true
             $updateParams['Description'] = $module.Params.description
         }
 
         if ($null -ne $module.Params.enable_network_virtualization -and
-            [bool]$module.Params.enable_network_virtualization -ne [bool]$profile.EnableNetworkVirtualization) {
+            [bool]$module.Params.enable_network_virtualization -ne [bool]$uplinkProfile.EnableNetworkVirtualization) {
             $needsUpdate = $true
             $updateParams['EnableNetworkVirtualization'] = $module.Params.enable_network_virtualization
         }
 
         if ($null -ne $module.Params.logical_network_definitions) {
-            $currentDefs = @($profile.LogicalNetworkDefinitions | ForEach-Object { $_.Name }) | Sort-Object
+            $currentDefs = @($uplinkProfile.LogicalNetworkDefinitions | ForEach-Object { $_.Name }) | Sort-Object
             $desiredDefs = @($module.Params.logical_network_definitions) | Sort-Object
             $diff = Compare-Object -ReferenceObject $currentDefs -DifferenceObject $desiredDefs -ErrorAction SilentlyContinue
             if ($diff) {
@@ -117,13 +117,13 @@ if ($module.Params.state -eq 'present') {
         }
 
         if ($needsUpdate) {
-            $module.Diff.before = Get-ProfileResult -Profile $profile
+            $module.Diff.before = Get-ProfileResult -Profile $uplinkProfile
             $module.Result.changed = $true
             if (-not $module.CheckMode) {
-                $updateParams['NativeUplinkPortProfile'] = $profile
+                $updateParams['NativeUplinkPortProfile'] = $uplinkProfile
                 $updateParams['ErrorAction'] = 'Stop'
                 try {
-                    $profile = Set-SCNativeUplinkPortProfile @updateParams
+                    $uplinkProfile = Set-SCNativeUplinkPortProfile @updateParams
                 }
                 catch {
                     $module.FailJson("Failed to update uplink port profile '$($module.Params.name)': $($_.Exception.Message)", $_)
@@ -132,28 +132,28 @@ if ($module.Params.state -eq 'present') {
         }
     }
 
-    if ($profile) {
-        $module.Result.uplink_port_profile = Get-ProfileResult -Profile $profile
+    if ($uplinkProfile) {
+        $module.Result.uplink_port_profile = Get-ProfileResult -Profile $uplinkProfile
         if ($module.Result.changed -and $module.Diff.before) {
             $module.Diff.after = $module.Result.uplink_port_profile
         }
     }
     elseif ($module.CheckMode) {
         $module.Result.uplink_port_profile = @{
-            name        = $module.Params.name
+            name = $module.Params.name
             description = $module.Params.description
         }
         $module.Diff.after = $module.Result.uplink_port_profile
     }
 }
 else {
-    if ($profile) {
-        $module.Diff.before = Get-ProfileResult -Profile $profile
+    if ($uplinkProfile) {
+        $module.Diff.before = Get-ProfileResult -Profile $uplinkProfile
         $module.Diff.after = @{}
         $module.Result.changed = $true
         if (-not $module.CheckMode) {
             try {
-                Remove-SCNativeUplinkPortProfile -NativeUplinkPortProfile $profile -ErrorAction Stop | Out-Null
+                Remove-SCNativeUplinkPortProfile -NativeUplinkPortProfile $uplinkProfile -ErrorAction Stop | Out-Null
             }
             catch {
                 $module.FailJson("Failed to remove uplink port profile '$($module.Params.name)': $($_.Exception.Message)", $_)

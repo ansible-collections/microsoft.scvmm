@@ -29,9 +29,9 @@ if ($module.Params.name) {
 
 $module.Result.uplink_port_profiles = @($profiles | ForEach-Object {
         $result = @{
-            id                            = $_.ID.ToString()
-            name                          = $_.Name
-            description                   = $_.Description
+            id = $_.ID.ToString()
+            name = $_.Name
+            description = $_.Description
             enable_network_virtualization = [bool]$_.EnableNetworkVirtualization
         }
         $result.logical_network_definitions = @($_.LogicalNetworkDefinitions | ForEach-Object { $_.Name })
