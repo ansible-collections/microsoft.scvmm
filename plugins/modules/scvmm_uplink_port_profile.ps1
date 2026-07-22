@@ -140,6 +140,7 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.uplink_port_profile = @{
+            id = $null
             name = $module.Params.name
             description = $module.Params.description
         }
