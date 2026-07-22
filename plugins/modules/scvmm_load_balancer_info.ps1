@@ -21,7 +21,7 @@ $module.Result.changed = $false
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
 $getParams = @{
-    VMMServer   = $vmmConnection
+    VMMServer = $vmmConnection
     ErrorAction = 'SilentlyContinue'
 }
 
@@ -36,13 +36,13 @@ $lbs = @(Get-SCLoadBalancer @getParams)
 
 $module.Result.load_balancers = @($lbs | ForEach-Object {
         @{
-            id                     = $_.ID.ToString()
-            address                = $_.Address
-            port                   = $_.Port
-            manufacturer           = $_.Manufacturer
-            model                  = $_.Model
+            id = $_.ID.ToString()
+            address = $_.Address
+            port = $_.Port
+            manufacturer = $_.Manufacturer
+            model = $_.Model
             configuration_provider = if ($_.ConfigurationProvider) { $_.ConfigurationProvider.Name } else { $null }
-            host_groups            = @($_.HostGroups | ForEach-Object { $_.Name })
+            host_groups = @($_.HostGroups | ForEach-Object { $_.Name })
         }
     })
 

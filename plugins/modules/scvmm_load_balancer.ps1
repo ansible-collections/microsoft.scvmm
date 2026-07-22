@@ -39,13 +39,13 @@ $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.P
 function Get-LBResult {
     param($LB)
     return @{
-        id                     = $LB.ID.ToString()
-        address                = $LB.Address
-        port                   = $LB.Port
-        manufacturer           = $LB.Manufacturer
-        model                  = $LB.Model
+        id = $LB.ID.ToString()
+        address = $LB.Address
+        port = $LB.Port
+        manufacturer = $LB.Manufacturer
+        model = $LB.Model
         configuration_provider = if ($LB.ConfigurationProvider) { $LB.ConfigurationProvider.Name } else { $null }
-        host_groups            = @($LB.HostGroups | ForEach-Object { $_.Name })
+        host_groups = @($LB.HostGroups | ForEach-Object { $_.Name })
     }
 }
 
@@ -121,10 +121,10 @@ if ($module.Params.state -eq 'present') {
     }
     elseif ($module.CheckMode) {
         $module.Result.load_balancer = @{
-            address      = $module.Params.address
-            port         = $module.Params.port
+            address = $module.Params.address
+            port = $module.Params.port
             manufacturer = $module.Params.manufacturer
-            model        = $module.Params.model
+            model = $module.Params.model
         }
         $module.Diff.after = $module.Result.load_balancer
     }
