@@ -144,6 +144,19 @@ if ($module.Params.state -eq 'present') {
     else {
         $module.Diff.before = Get-PoolResult -Pool $pool
 
+        if ($null -ne $module.Params.ip_address_range_start -and
+            $pool.IPAddressRangeStart -ne $module.Params.ip_address_range_start) {
+            $cur = $pool.IPAddressRangeStart
+            $req = $module.Params.ip_address_range_start
+            $module.Warn("Cannot change 'ip_address_range_start' after creation (current: '$cur', requested: '$req'). Delete and recreate.")
+        }
+        if ($null -ne $module.Params.ip_address_range_end -and
+            $pool.IPAddressRangeEnd -ne $module.Params.ip_address_range_end) {
+            $cur = $pool.IPAddressRangeEnd
+            $req = $module.Params.ip_address_range_end
+            $module.Warn("Cannot change 'ip_address_range_end' after creation (current: '$cur', requested: '$req'). Delete and recreate.")
+        }
+
         $needsUpdate = Test-SCVMMPropertiesChanged -PropertyMap $updateMap `
             -CurrentObject $pool -AnsibleParams $module.Params
         $setParams = @{}
@@ -171,6 +184,14 @@ if ($module.Params.state -eq 'present') {
                     })
             }
         }
+        if ($null -ne $module.Params.dns_search_suffixes) {
+            $current = @($pool.DNSSearchSuffixes) -join ','
+            $desired = @($module.Params.dns_search_suffixes) -join ','
+            if ($current -ne $desired) {
+                $needsUpdate = $true
+                $setParams['DNSSearchSuffix'] = $module.Params.dns_search_suffixes
+            }
+        }
 
         if ($needsUpdate) {
             $module.Result.changed = $true
@@ -196,6 +217,9 @@ if ($module.Params.state -eq 'present') {
             }
             if ($null -ne $module.Params.default_gateways) {
                 $projected['default_gateways'] = @($module.Params.default_gateways)
+            }
+            if ($null -ne $module.Params.dns_search_suffixes) {
+                $projected['dns_search_suffixes'] = @($module.Params.dns_search_suffixes)
             }
             $module.Diff.after = $projected
         }

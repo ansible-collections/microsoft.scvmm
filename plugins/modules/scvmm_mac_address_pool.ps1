@@ -29,16 +29,6 @@ $module = [Ansible.Basic.AnsibleModule]::Create($args, $spec)
 
 $module.Result.changed = $false
 
-$macRegex = '^([0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}$'
-if ($null -ne $module.Params.mac_address_range_start -and
-    $module.Params.mac_address_range_start -notmatch $macRegex) {
-    $module.FailJson("mac_address_range_start must be in format XX-XX-XX-XX-XX-XX (e.g. 00-1D-D8-B7-1C-00)")
-}
-if ($null -ne $module.Params.mac_address_range_end -and
-    $module.Params.mac_address_range_end -notmatch $macRegex) {
-    $module.FailJson("mac_address_range_end must be in format XX-XX-XX-XX-XX-XX (e.g. 00-1D-D8-F4-1F-FF)")
-}
-
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
 $propertyMap = @(
@@ -56,14 +46,7 @@ $updateMap = @(
 
 function Get-PoolResult {
     param($Pool)
-    $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $Pool
-    if ($result['mac_address_range_start']) {
-        $result['mac_address_range_start'] = $result['mac_address_range_start'].Replace(':', '-')
-    }
-    if ($result['mac_address_range_end']) {
-        $result['mac_address_range_end'] = $result['mac_address_range_end'].Replace(':', '-')
-    }
-    return $result
+    return Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $Pool
 }
 
 $pool = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
@@ -87,9 +70,9 @@ if ($module.Params.state -eq 'present') {
         if (-not $module.CheckMode) {
             try {
                 $hostGroups = @($module.Params.host_groups | ForEach-Object {
-                        Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
-                            -CmdletName 'Get-SCVMHostGroup' -Name $_ `
-                            -ObjectType 'Host group' -FailIfNotFound $true
+                        $hg = Get-SCVMHostGroup -VMMServer $vmmConnection -Name $_ -ErrorAction Stop
+                        if (-not $hg) { $module.FailJson("Host group '$_' not found") }
+                        $hg
                     })
 
                 $newParams = @{
@@ -126,17 +109,15 @@ if ($module.Params.state -eq 'present') {
     else {
         $module.Diff.before = Get-PoolResult -Pool $pool
 
-        $currentStart = if ($pool.MACAddressRangeStart) { $pool.MACAddressRangeStart.Replace(':', '-') } else { $null }
-        $currentEnd = if ($pool.MACAddressRangeEnd) { $pool.MACAddressRangeEnd.Replace(':', '-') } else { $null }
         if ($null -ne $module.Params.mac_address_range_start -and
-            $currentStart -ne $module.Params.mac_address_range_start) {
-            $cur = $currentStart
+            $pool.MACAddressRangeStart -ne $module.Params.mac_address_range_start) {
+            $cur = $pool.MACAddressRangeStart
             $req = $module.Params.mac_address_range_start
             $module.Warn("Cannot change 'mac_address_range_start' after creation (current: '$cur', requested: '$req'). Delete and recreate.")
         }
         if ($null -ne $module.Params.mac_address_range_end -and
-            $currentEnd -ne $module.Params.mac_address_range_end) {
-            $cur = $currentEnd
+            $pool.MACAddressRangeEnd -ne $module.Params.mac_address_range_end) {
+            $cur = $pool.MACAddressRangeEnd
             $req = $module.Params.mac_address_range_end
             $module.Warn("Cannot change 'mac_address_range_end' after creation (current: '$cur', requested: '$req'). Delete and recreate.")
         }
@@ -148,7 +129,7 @@ if ($module.Params.state -eq 'present') {
                 $hgChanged = $true
             }
             elseif ($currentHGs.Count -gt 0) {
-                $diff = Compare-Object -ReferenceObject $currentHGs -DifferenceObject $desiredHGs
+                $diff = Compare-Object -ReferenceObject $currentHGs -DifferenceObject $desiredHGs -ErrorAction SilentlyContinue
                 if ($diff) { $hgChanged = $true }
             }
             if ($hgChanged) {
