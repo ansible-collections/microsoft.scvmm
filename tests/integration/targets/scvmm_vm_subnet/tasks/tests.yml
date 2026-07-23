@@ -1,0 +1,276 @@
+---
+# ============================================================
+# Check-mode create
+# ============================================================
+- name: Create VM subnet in check mode
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    description: "Test VM subnet"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_create
+
+- name: Assert check-mode create reports changed
+  ansible.builtin.assert:
+    that:
+      - check_create is changed
+      - check_create.vm_subnet.name == test_subnet_name
+
+- name: Verify subnet does not exist after check-mode create
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert subnet was not actually created
+  ansible.builtin.assert:
+    that:
+      - after_check_create.vm_subnets | length == 0
+
+# ============================================================
+# Create
+# ============================================================
+- name: Create VM subnet
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    description: "Test VM subnet"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Verify create result
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.vm_subnet.name == test_subnet_name
+      - create_result.vm_subnet.description == "Test VM subnet"
+      - create_result.vm_subnet.vm_network == test_vmnet_name
+
+- name: Verify create with info module
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_create
+
+- name: Assert info matches create
+  ansible.builtin.assert:
+    that:
+      - info_after_create.vm_subnets | length == 1
+      - info_after_create.vm_subnets[0].name == test_subnet_name
+      - info_after_create.vm_subnets[0].description == "Test VM subnet"
+      - info_after_create.vm_subnets[0].vm_network == test_vmnet_name
+      - info_after_create.vm_subnets[0].subnet_vlans | length >= 1
+
+- name: Query subnets by VM network (info)
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: subnets_by_vmnet
+
+- name: Assert subnet found by VM network filter
+  ansible.builtin.assert:
+    that:
+      - subnets_by_vmnet.vm_subnets | length >= 1
+      - test_subnet_name in (subnets_by_vmnet.vm_subnets | map(attribute='name') | list)
+
+- name: Query non-existent subnet (info)
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "NonExistent_VMSubnet_99999"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_subnet
+
+- name: Assert empty result
+  ansible.builtin.assert:
+    that:
+      - no_subnet.vm_subnets | length == 0
+
+# ============================================================
+# Idempotency
+# ============================================================
+- name: Create VM subnet again (idempotency)
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    description: "Test VM subnet"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_again
+
+- name: Verify idempotency
+  ansible.builtin.assert:
+    that:
+      - create_again is not changed
+
+# ============================================================
+# Update
+# ============================================================
+- name: Update VM subnet description
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    description: "Updated VM subnet"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Verify update result
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Verify update with info module
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_update
+
+- name: Assert info reflects update
+  ansible.builtin.assert:
+    that:
+      - info_after_update.vm_subnets[0].description == "Updated VM subnet"
+
+# ============================================================
+# Update idempotency
+# ============================================================
+- name: Update VM subnet description again (idempotency)
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    description: "Updated VM subnet"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_idem
+
+- name: Verify update idempotency
+  ansible.builtin.assert:
+    that:
+      - update_idem is not changed
+
+# ============================================================
+# VLAN ID
+# ============================================================
+- name: Delete subnet to recreate with vlan_id
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Create VM subnet with vlan_id
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    vlan_id: "{{ test_vlan_id | int }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_vlan
+
+- name: Assert subnet created with vlan_id
+  ansible.builtin.assert:
+    that:
+      - create_vlan is changed
+      - create_vlan.vm_subnet.subnet_vlans | length >= 1
+
+- name: Verify vlan_id via info module
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_vlan
+
+- name: Assert vlan_id is set correctly
+  ansible.builtin.assert:
+    that:
+      - info_vlan.vm_subnets[0].subnet_vlans | length >= 1
+
+# ============================================================
+# Check mode
+# ============================================================
+- name: Delete VM subnet (check mode)
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: delete_check
+
+- name: Verify check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - delete_check is changed
+
+- name: Verify subnet still exists after check mode
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_check
+
+- name: Assert subnet still exists
+  ansible.builtin.assert:
+    that:
+      - info_after_check.vm_subnets | length == 1
+
+# ============================================================
+# Delete
+# ============================================================
+- name: Delete VM subnet
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Verify delete result
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Verify deletion with info module
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_delete
+
+- name: Assert subnet is gone
+  ansible.builtin.assert:
+    that:
+      - info_after_delete.vm_subnets | length == 0
+
+# ============================================================
+# Absent idempotency
+# ============================================================
+- name: Delete VM subnet again (idempotency)
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_again
+
+- name: Verify absent idempotency
+  ansible.builtin.assert:
+    that:
+      - delete_again is not changed
+
+# ============================================================
+# Re-create for teardown verification
+# ============================================================
+- name: Re-create VM subnet for teardown
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: recreate_result
+
+- name: Verify re-create
+  ansible.builtin.assert:
+    that:
+      - recreate_result is changed
