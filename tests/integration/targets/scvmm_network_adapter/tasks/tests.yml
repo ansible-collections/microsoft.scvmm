@@ -1,0 +1,151 @@
+---
+- name: Get initial adapters via info module
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: initial_adapters
+
+- name: Record initial adapter count
+  ansible.builtin.set_fact:
+    initial_count: "{{ initial_adapters.network_adapters | length }}"
+
+# --- Add adapter (no connection) ---
+- name: Add network adapter (no connection)
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: add_nic
+
+- name: Assert adapter added
+  ansible.builtin.assert:
+    that:
+      - add_nic.changed == true
+      - add_nic.network_adapter is defined
+      - add_nic.network_adapter.id is defined
+      - add_nic.network_adapter.vm_name == test_vm
+      - add_nic.network_adapter.is_synthetic == true
+
+- name: Verify adapter count increased via info module
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_add
+
+- name: Assert adapter count increased
+  ansible.builtin.assert:
+    that:
+      - after_add.network_adapters | length == (initial_count | int) + 1
+
+# --- Check mode add ---
+- name: Check mode - add another adapter
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_add
+
+- name: Assert check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - check_add.changed == true
+
+- name: Verify check mode did not add adapter
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: check_add_verify
+
+- name: Assert adapter count unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - check_add_verify.network_adapters | length == (initial_count | int) + 1
+
+# --- Check mode remove ---
+- name: Check mode - remove adapter
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove
+
+- name: Assert check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - check_remove.changed == true
+
+- name: Verify check mode did not remove adapter
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: check_remove_verify
+
+- name: Assert adapter still exists after check mode
+  ansible.builtin.assert:
+    that:
+      - check_remove_verify.network_adapters | length == (initial_count | int) + 1
+
+# --- Remove the adapter we added ---
+- name: Remove last network adapter
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_nic
+
+- name: Assert adapter removed
+  ansible.builtin.assert:
+    that:
+      - remove_nic.changed == true
+
+- name: Verify adapter count back to initial
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_remove
+
+- name: Assert adapter count restored
+  ansible.builtin.assert:
+    that:
+      - after_remove.network_adapters | length == (initial_count | int)
+
+# --- Absent on non-existent VM is safe (idempotent) ---
+- name: Remove adapter from non-existent VM (safe no-op)
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: absent_nonexistent
+
+- name: Assert no change for absent on non-existent VM
+  ansible.builtin.assert:
+    that:
+      - absent_nonexistent.changed == false
+
+# --- Info module edge cases ---
+- name: Query adapters for non-existent VM
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: nonexistent_info
+
+- name: Assert empty list for non-existent VM
+  ansible.builtin.assert:
+    that:
+      - nonexistent_info.network_adapters | length == 0
+
+# --- Error handling ---
+- name: Add adapter to non-existent VM
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: add_error
+  ignore_errors: true
+
+- name: Assert error for non-existent VM
+  ansible.builtin.assert:
+    that:
+      - add_error.failed == true
