@@ -29,6 +29,16 @@ $module = [Ansible.Basic.AnsibleModule]::Create($args, $spec)
 
 $module.Result.changed = $false
 
+$macRegex = '^([0-9A-Fa-f]{2}-){5}[0-9A-Fa-f]{2}$'
+if ($null -ne $module.Params.mac_address_range_start -and
+    $module.Params.mac_address_range_start -notmatch $macRegex) {
+    $module.FailJson("mac_address_range_start must be in format XX-XX-XX-XX-XX-XX (e.g. 00-1D-D8-B7-1C-00)")
+}
+if ($null -ne $module.Params.mac_address_range_end -and
+    $module.Params.mac_address_range_end -notmatch $macRegex) {
+    $module.FailJson("mac_address_range_end must be in format XX-XX-XX-XX-XX-XX (e.g. 00-1D-D8-F4-1F-FF)")
+}
+
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
 
 $propertyMap = @(
@@ -129,7 +139,7 @@ if ($module.Params.state -eq 'present') {
                 $hgChanged = $true
             }
             elseif ($currentHGs.Count -gt 0) {
-                $diff = Compare-Object -ReferenceObject $currentHGs -DifferenceObject $desiredHGs -ErrorAction SilentlyContinue
+                $diff = Compare-Object -ReferenceObject $currentHGs -DifferenceObject $desiredHGs
                 if ($diff) { $hgChanged = $true }
             }
             if ($hgChanged) {

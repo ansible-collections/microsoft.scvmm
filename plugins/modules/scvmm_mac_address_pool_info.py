@@ -59,7 +59,7 @@ mac_address_pools:
     description:
       description: Pool description.
       type: str
-      returned: when available
+      returned: always
       sample: Default MAC address pool
     mac_address_range_start:
       description: Starting MAC address.

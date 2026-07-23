@@ -1,5 +1,38 @@
 ---
 # ============================================================
+# Check-mode create
+# ============================================================
+- name: Create MAC address pool in check mode
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    description: "Test MAC address pool"
+    mac_address_range_start: "{{ test_mac_start }}"
+    mac_address_range_end: "{{ test_mac_end }}"
+    host_groups:
+      - All Hosts
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_create
+
+- name: Assert check-mode create reports changed
+  ansible.builtin.assert:
+    that:
+      - check_create is changed
+      - check_create.mac_address_pool.name == test_pool_name
+
+- name: Verify pool does not exist after check-mode create
+  microsoft.scvmm.scvmm_mac_address_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert pool was not actually created
+  ansible.builtin.assert:
+    that:
+      - after_check_create.mac_address_pools | length == 0
+
+# ============================================================
 # Create
 # ============================================================
 - name: Create MAC address pool
@@ -103,6 +136,42 @@
   ansible.builtin.assert:
     that:
       - info_after_update.mac_address_pools[0].description == "Updated MAC pool description"
+
+# ============================================================
+# Update idempotency
+# ============================================================
+- name: Update MAC address pool description again (idempotency)
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    description: "Updated MAC pool description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_idem
+
+- name: Verify update idempotency
+  ansible.builtin.assert:
+    that:
+      - update_idem is not changed
+
+# ============================================================
+# Host groups immutable warning
+# ============================================================
+- name: Attempt to change host groups (expect warning)
+  microsoft.scvmm.scvmm_mac_address_pool:
+    name: "{{ test_pool_name }}"
+    host_groups:
+      - "NonExistentHostGroup"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: hg_change
+  ignore_errors: false
+
+- name: Assert warning was emitted for host_groups change
+  ansible.builtin.assert:
+    that:
+      - hg_change.warnings is defined
+      - hg_change.warnings | length > 0
+      - "'host_groups' in hg_change.warnings[0]"
 
 # ============================================================
 # Check mode

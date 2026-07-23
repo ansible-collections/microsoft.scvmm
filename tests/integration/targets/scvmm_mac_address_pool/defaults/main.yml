@@ -1,2 +1,5 @@
 ---
 scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_pool_name: Ansible-Test-MAC-Pool
+test_mac_start: "00-1D-D9-AA-00-00"
+test_mac_end: "00-1D-D9-AA-FF-FF"
