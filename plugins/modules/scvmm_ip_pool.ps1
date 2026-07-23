@@ -56,6 +56,15 @@ $propertyMap = @(
     @{ Param = "logical_network_definition"; Property = "LogicalNetworkDefinition"; Type = "nested_name" }
 )
 
+$createMap = @(
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "ip_address_range_start"; Property = "IPAddressRangeStart"; Type = "string" }
+    @{ Param = "ip_address_range_end"; Property = "IPAddressRangeEnd"; Type = "string" }
+    @{ Param = "dns_suffix"; Property = "DNSSuffix"; Type = "string" }
+    @{ Param = "dns_servers"; Property = "DNSServers"; Type = "string"; CmdletParam = "DNSServer" }
+    @{ Param = "dns_search_suffixes"; Property = "DNSSearchSuffixes"; Type = "string"; CmdletParam = "DNSSearchSuffix" }
+)
+
 $updateMap = @(
     @{ Param = "description"; Property = "Description"; Type = "string" }
     @{ Param = "dns_suffix"; Property = "DNSSuffix"; Type = "string" }
@@ -80,10 +89,10 @@ if ($module.Params.state -eq 'present') {
         $module.Result.changed = $true
         if (-not $module.CheckMode) {
             try {
-                $lnd = Get-SCLogicalNetworkDefinition -VMMServer $vmmConnection -Name $module.Params.logical_network_definition -ErrorAction Stop
-                if (-not $lnd) {
-                    $module.FailJson("Logical network definition '$($module.Params.logical_network_definition)' not found")
-                }
+                $lnd = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCLogicalNetworkDefinition' `
+                    -Name $module.Params.logical_network_definition `
+                    -ObjectType 'Logical network definition' -FailIfNotFound $true
 
                 $newParams = @{
                     VMMServer = $vmmConnection
@@ -92,28 +101,14 @@ if ($module.Params.state -eq 'present') {
                     Subnet = $module.Params.subnet
                     ErrorAction = 'Stop'
                 }
-                if ($null -ne $module.Params.description) {
-                    $newParams['Description'] = $module.Params.description
-                }
-                if ($null -ne $module.Params.ip_address_range_start) {
-                    $newParams['IPAddressRangeStart'] = $module.Params.ip_address_range_start
-                }
-                if ($null -ne $module.Params.ip_address_range_end) {
-                    $newParams['IPAddressRangeEnd'] = $module.Params.ip_address_range_end
+                $createParams = Get-SCVMMParametersFromMap -PropertyMap $createMap -AnsibleParams $module.Params
+                foreach ($key in $createParams.Keys) {
+                    $newParams[$key] = $createParams[$key]
                 }
                 if ($null -ne $module.Params.default_gateways) {
                     $newParams['DefaultGateway'] = @($module.Params.default_gateways | ForEach-Object {
                             New-SCDefaultGateway -IPAddress $_ -ErrorAction Stop
                         })
-                }
-                if ($null -ne $module.Params.dns_servers) {
-                    $newParams['DNSServer'] = $module.Params.dns_servers
-                }
-                if ($null -ne $module.Params.dns_suffix) {
-                    $newParams['DNSSuffix'] = $module.Params.dns_suffix
-                }
-                if ($null -ne $module.Params.dns_search_suffixes) {
-                    $newParams['DNSSearchSuffix'] = $module.Params.dns_search_suffixes
                 }
 
                 $pool = New-SCStaticIPAddressPool @newParams

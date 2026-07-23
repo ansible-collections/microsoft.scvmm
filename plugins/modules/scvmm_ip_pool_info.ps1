@@ -32,7 +32,10 @@ $propertyMap = @(
 )
 
 if ($module.Params.logical_network_definition) {
-    $lnd = Get-SCLogicalNetworkDefinition -VMMServer $vmmConnection -Name $module.Params.logical_network_definition -ErrorAction Stop
+    $lnd = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+        -CmdletName 'Get-SCLogicalNetworkDefinition' `
+        -Name $module.Params.logical_network_definition `
+        -ObjectType 'Logical network definition'
     if (-not $lnd) {
         $module.Result.ip_pools = @()
         $module.ExitJson()
