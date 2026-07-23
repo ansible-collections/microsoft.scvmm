@@ -41,6 +41,15 @@ $propertyMap = @(
     @{ Param = "allow_dynamic_vlan_on_vnic"; Property = "AllowDynamicVlanOnVnic"; Type = "bool" }
 )
 
+$createMap = @(
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "network_virtualization_enabled"; Property = "NetworkVirtualizationEnabled"; Type = "bool"; CmdletParam = "EnableNetworkVirtualization" }
+    @{ Param = "use_gre"; Property = "UseGRE"; Type = "bool" }
+    @{ Param = "is_pvlan"; Property = "IsPVLAN"; Type = "bool" }
+    @{ Param = "definition_isolation"; Property = "LogicalNetworkDefinitionIsolation"; Type = "bool" }
+    @{ Param = "allow_dynamic_vlan_on_vnic"; Property = "AllowDynamicVlanOnVnic"; Type = "bool" }
+)
+
 $updateMap = @(
     @{ Param = "description"; Property = "Description"; Type = "string" }
     @{ Param = "network_virtualization_enabled"; Property = "NetworkVirtualizationEnabled"; Type = "bool"; CmdletParam = "EnableNetworkVirtualization" }
@@ -62,23 +71,9 @@ if ($module.Params.state -eq 'present') {
                 VMMServer = $vmmConnection
                 ErrorAction = 'Stop'
             }
-            if ($null -ne $module.Params.description) {
-                $newParams['Description'] = $module.Params.description
-            }
-            if ($null -ne $module.Params.network_virtualization_enabled) {
-                $newParams['EnableNetworkVirtualization'] = $module.Params.network_virtualization_enabled
-            }
-            if ($null -ne $module.Params.use_gre) {
-                $newParams['UseGRE'] = $module.Params.use_gre
-            }
-            if ($null -ne $module.Params.is_pvlan) {
-                $newParams['IsPVLAN'] = $module.Params.is_pvlan
-            }
-            if ($null -ne $module.Params.definition_isolation) {
-                $newParams['LogicalNetworkDefinitionIsolation'] = $module.Params.definition_isolation
-            }
-            if ($null -ne $module.Params.allow_dynamic_vlan_on_vnic) {
-                $newParams['AllowDynamicVlanOnVnic'] = $module.Params.allow_dynamic_vlan_on_vnic
+            $createParams = Get-SCVMMParametersFromMap -PropertyMap $createMap -AnsibleParams $module.Params
+            foreach ($key in $createParams.Keys) {
+                $newParams[$key] = $createParams[$key]
             }
             try {
                 $logicalNetwork = New-SCLogicalNetwork @newParams
