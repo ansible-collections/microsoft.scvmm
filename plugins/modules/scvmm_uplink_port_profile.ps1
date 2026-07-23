@@ -64,11 +64,9 @@ if ($module.Params.state -eq 'present') {
                     VMMServer = $vmmConnection
                     ErrorAction = 'Stop'
                 }
-                if ($null -ne $module.Params.description) {
-                    $newParams['Description'] = $module.Params.description
-                }
-                if ($null -ne $module.Params.enable_network_virtualization) {
-                    $newParams['EnableNetworkVirtualization'] = $module.Params.enable_network_virtualization
+                $createParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap -AnsibleParams $module.Params
+                foreach ($key in $createParams.Keys) {
+                    $newParams[$key] = $createParams[$key]
                 }
                 if ($null -ne $module.Params.logical_network_definitions -and $module.Params.logical_network_definitions.Count -gt 0) {
                     $lnDefs = @($module.Params.logical_network_definitions | ForEach-Object {

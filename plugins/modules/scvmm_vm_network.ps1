@@ -41,6 +41,11 @@ $propertyMap = @(
     @{ Param = "isolation_type"; Property = "IsolationType"; Type = "enum" }
 )
 
+$createMap = @(
+    @{ Param = "description"; Property = "Description"; Type = "string" }
+    @{ Param = "isolation_type"; Property = "IsolationType"; Type = "enum" }
+)
+
 $updateMap = @(
     @{ Param = "description"; Property = "Description"; Type = "string" }
 )
@@ -55,21 +60,18 @@ if ($module.Params.state -eq 'present') {
         $module.Result.changed = $true
         if (-not $module.CheckMode) {
             try {
-                $logicalNetwork = Get-SCLogicalNetwork -VMMServer $vmmConnection -Name $module.Params.logical_network -ErrorAction Stop
-                if (-not $logicalNetwork) {
-                    $module.FailJson("Logical network '$($module.Params.logical_network)' not found")
-                }
+                $logicalNetwork = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCLogicalNetwork' -Name $module.Params.logical_network `
+                    -ObjectType 'Logical network' -FailIfNotFound $true
 
                 $newParams = @{
                     Name = $module.Params.name
                     LogicalNetwork = $logicalNetwork
                     ErrorAction = 'Stop'
                 }
-                if ($null -ne $module.Params.description) {
-                    $newParams['Description'] = $module.Params.description
-                }
-                if ($null -ne $module.Params.isolation_type) {
-                    $newParams['IsolationType'] = $module.Params.isolation_type
+                $createParams = Get-SCVMMParametersFromMap -PropertyMap $createMap -AnsibleParams $module.Params
+                foreach ($key in $createParams.Keys) {
+                    $newParams[$key] = $createParams[$key]
                 }
                 $vmNetwork = New-SCVMNetwork @newParams
                 $module.Result.vm_network = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $vmNetwork
