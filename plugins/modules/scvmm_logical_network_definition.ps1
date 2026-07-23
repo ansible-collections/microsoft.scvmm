@@ -76,10 +76,9 @@ if ($module.Params.state -eq 'present') {
         $module.Result.changed = $true
         if (-not $module.CheckMode) {
             try {
-                $logicalNetwork = Get-SCLogicalNetwork -VMMServer $vmmConnection -Name $module.Params.logical_network -ErrorAction Stop
-                if (-not $logicalNetwork) {
-                    $module.FailJson("Logical network '$($module.Params.logical_network)' not found")
-                }
+                $logicalNetwork = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCLogicalNetwork' -Name $module.Params.logical_network `
+                    -ObjectType 'Logical network' -FailIfNotFound $true
 
                 $subnetVLans = @($module.Params.subnet_vlans | ForEach-Object {
                         New-SCSubnetVLan -Subnet $_.subnet -VLanID $_.vlan_id
