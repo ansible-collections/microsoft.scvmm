@@ -1,0 +1,290 @@
+---
+# ── Check-mode create ──
+- name: Create uplink port profile in check mode
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    description: "Ansible test uplink profile"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_create
+
+- name: Assert check-mode create reports changed
+  ansible.builtin.assert:
+    that:
+      - check_create is changed
+      - check_create.uplink_port_profile.name == test_profile_name
+
+- name: Verify profile does not exist after check-mode create
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert profile was not actually created
+  ansible.builtin.assert:
+    that:
+      - after_check_create.uplink_port_profiles | length == 0
+
+# ── Create uplink port profile ──
+- name: Create uplink port profile
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    description: "Ansible test uplink profile"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert profile was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.uplink_port_profile.name == test_profile_name
+      - create_result.uplink_port_profile.description == "Ansible test uplink profile"
+      - create_result.uplink_port_profile.id is defined
+      - create_result.uplink_port_profile.id | length > 0
+
+# ── Verify creation with info module ──
+- name: Verify profile via info module
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created profile
+  ansible.builtin.assert:
+    that:
+      - verify_create.uplink_port_profiles | length == 1
+      - verify_create.uplink_port_profiles[0].name == test_profile_name
+      - verify_create.uplink_port_profiles[0].description == "Ansible test uplink profile"
+      - verify_create.uplink_port_profiles[0].id == create_result.uplink_port_profile.id
+
+# ── Info: query all ──
+- name: Get all uplink port profiles
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert test profile appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_profiles.uplink_port_profiles | length > 0
+      - test_profile_name in (all_profiles.uplink_port_profiles | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Query non-existent uplink port profile
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "NonExistent_Profile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.uplink_port_profiles | length == 0
+
+# ── Idempotency ──
+- name: Create same profile again (idempotency)
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    description: "Ansible test uplink profile"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update profile description
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    description: "Updated uplink profile"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert profile was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.uplink_port_profile.description == "Updated uplink profile"
+
+# ── Verify update with info module ──
+- name: Verify update via info module
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.uplink_port_profiles[0].description == "Updated uplink profile"
+
+# ── Check mode ──
+- name: Update profile in check mode
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description unchanged after check mode
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert description still has previous value
+  ansible.builtin.assert:
+    that:
+      - after_check.uplink_port_profiles[0].description == "Updated uplink profile"
+
+# ── Enable network virtualization ──
+- name: Enable network virtualization on profile
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    enable_network_virtualization: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_nv
+
+- name: Assert network virtualization was enabled
+  ansible.builtin.assert:
+    that:
+      - enable_nv is changed
+      - enable_nv.uplink_port_profile.enable_network_virtualization == true
+
+- name: Verify enable_network_virtualization via info module
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_nv
+
+- name: Assert info module shows virtualization enabled
+  ansible.builtin.assert:
+    that:
+      - verify_nv.uplink_port_profiles[0].enable_network_virtualization == true
+
+- name: Enable network virtualization again (idempotency)
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    enable_network_virtualization: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_nv_idem
+
+- name: Assert no change on idempotent enable
+  ansible.builtin.assert:
+    that:
+      - enable_nv_idem is not changed
+
+# ── Logical network definitions ──
+- name: Add logical network definition to profile
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    logical_network_definitions:
+      - "{{ test_logical_network_definition }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: add_lnd
+
+- name: Assert logical network definition was added
+  ansible.builtin.assert:
+    that:
+      - add_lnd is changed
+      - test_logical_network_definition in add_lnd.uplink_port_profile.logical_network_definitions
+
+- name: Verify logical network definitions via info module
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_lnd
+
+- name: Assert info module shows logical network definition
+  ansible.builtin.assert:
+    that:
+      - test_logical_network_definition in verify_lnd.uplink_port_profiles[0].logical_network_definitions
+
+- name: Set same logical network definitions again (idempotency)
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    logical_network_definitions:
+      - "{{ test_logical_network_definition }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: lnd_idem
+
+- name: Assert no change on idempotent logical network definitions
+  ansible.builtin.assert:
+    that:
+      - lnd_idem is not changed
+
+- name: Remove logical network definitions from profile
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    logical_network_definitions: []
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: remove_lnd
+
+- name: Assert logical network definitions were removed
+  ansible.builtin.assert:
+    that:
+      - remove_lnd is changed
+      - remove_lnd.uplink_port_profile.logical_network_definitions | length == 0
+
+# ── Delete ──
+- name: Remove profile
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert profile was removed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify deletion via info module
+  microsoft.scvmm.scvmm_uplink_port_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module confirms deletion
+  ansible.builtin.assert:
+    that:
+      - verify_delete.uplink_port_profiles | length == 0
+
+# ── Absent idempotency ──
+- name: Remove profile again (idempotency)
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed
+
+# ── Re-create for teardown ──
+- name: Re-create profile for teardown
+  microsoft.scvmm.scvmm_uplink_port_profile:
+    name: "{{ test_profile_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"

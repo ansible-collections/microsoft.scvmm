@@ -1,0 +1,55 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_profile_name: "AnsibleTest_UplinkProfile_{{ 99999 | random }}"
+    test_ln_name: "AnsibleTest_Uplink_LN_{{ 99999 | random }}"
+
+- name: Derive logical network definition name
+  ansible.builtin.set_fact:
+    test_logical_network_definition: "{{ test_ln_name }}_LND"
+
+- block:
+    - name: Setup - Create logical network and definition
+      ansible.windows.win_shell: |
+        $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+        $ln = New-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -ErrorAction Stop
+        $hg = Get-SCVMHostGroup -VMMServer $vmmServer -Name "All Hosts"
+        $subnetVlan = New-SCSubnetVLan -Subnet "10.98.0.0/24" -VLanID 0
+        New-SCLogicalNetworkDefinition -Name "{{ test_logical_network_definition }}" -LogicalNetwork $ln -VMHostGroup $hg -SubnetVLan $subnetVlan -ErrorAction Stop | Out-Null
+        "created"
+      register: setup_ln
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test uplink port profile
+      microsoft.scvmm.scvmm_uplink_port_profile:
+        name: "{{ test_profile_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove logical network via PowerShell
+      ansible.windows.win_shell: |
+        $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+        $ln = Get-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}"
+        if ($ln) {
+          Get-SCLogicalNetworkDefinition -LogicalNetwork $ln | ForEach-Object {
+            Remove-SCLogicalNetworkDefinition -LogicalNetworkDefinition $_ -Force | Out-Null
+          }
+          Remove-SCLogicalNetwork -LogicalNetwork $ln -Force | Out-Null
+        }
+        "done"
+      ignore_errors: true
+
+    - name: Teardown - Validate profile removed
+      microsoft.scvmm.scvmm_uplink_port_profile_info:
+        name: "{{ test_profile_name }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      ansible.builtin.assert:
+        that:
+          - teardown_validate.uplink_port_profiles | length == 0
