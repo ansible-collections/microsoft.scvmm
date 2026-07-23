@@ -40,7 +40,11 @@ if ($module.Params.name) {
 if ($module.Params.logical_network) {
     $ln = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
         -CmdletName 'Get-SCLogicalNetwork' -Name $module.Params.logical_network `
-        -ObjectType 'Logical network' -FailIfNotFound $true
+        -ObjectType 'Logical network'
+    if (-not $ln) {
+        $module.Result.vm_networks = @()
+        $module.ExitJson()
+    }
     $getParams['LogicalNetwork'] = $ln
 }
 
