@@ -1,0 +1,188 @@
+---
+# ── Create VM network ──
+- name: Create VM network
+  microsoft.scvmm.scvmm_vm_network:
+    name: "{{ test_vmnet_name }}"
+    logical_network: "{{ test_ln_name }}"
+    description: "Ansible test VM network"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert VM network was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.vm_network.name == test_vmnet_name
+      - create_result.vm_network.description == "Ansible test VM network"
+      - create_result.vm_network.logical_network == test_ln_name
+      - create_result.vm_network.id is defined
+      - create_result.vm_network.id | length > 0
+
+# ── Verify creation with info module ──
+- name: Verify VM network via info module
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created VM network
+  ansible.builtin.assert:
+    that:
+      - verify_create.vm_networks | length == 1
+      - verify_create.vm_networks[0].name == test_vmnet_name
+      - verify_create.vm_networks[0].description == "Ansible test VM network"
+      - verify_create.vm_networks[0].id == create_result.vm_network.id
+
+# ── Info: query by logical network ──
+- name: Get VM networks by logical network
+  microsoft.scvmm.scvmm_vm_network_info:
+    logical_network: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_ln
+
+- name: Assert query by logical network returns test VM network
+  ansible.builtin.assert:
+    that:
+      - by_ln.vm_networks | length >= 1
+      - test_vmnet_name in (by_ln.vm_networks | map(attribute='name') | list)
+
+# ── Info: query all ──
+- name: Get all VM networks
+  microsoft.scvmm.scvmm_vm_network_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_nets
+
+- name: Assert test VM network appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_nets.vm_networks | length > 0
+      - test_vmnet_name in (all_nets.vm_networks | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Query non-existent VM network
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "NonExistent_VMNet_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.vm_networks | length == 0
+
+# ── Idempotency ──
+- name: Create same VM network again (idempotency)
+  microsoft.scvmm.scvmm_vm_network:
+    name: "{{ test_vmnet_name }}"
+    logical_network: "{{ test_ln_name }}"
+    description: "Ansible test VM network"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update VM network description
+  microsoft.scvmm.scvmm_vm_network:
+    name: "{{ test_vmnet_name }}"
+    logical_network: "{{ test_ln_name }}"
+    description: "Updated VM network description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert VM network was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.vm_network.description == "Updated VM network description"
+
+# ── Verify update with info module ──
+- name: Verify update via info module
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.vm_networks[0].description == "Updated VM network description"
+
+# ── Check mode ──
+- name: Update VM network in check mode
+  microsoft.scvmm.scvmm_vm_network:
+    name: "{{ test_vmnet_name }}"
+    logical_network: "{{ test_ln_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description unchanged after check mode
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert description still has previous value
+  ansible.builtin.assert:
+    that:
+      - after_check.vm_networks[0].description == "Updated VM network description"
+
+# ── Delete ──
+- name: Remove VM network
+  microsoft.scvmm.scvmm_vm_network:
+    name: "{{ test_vmnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert VM network was removed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify deletion via info module
+  microsoft.scvmm.scvmm_vm_network_info:
+    name: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module confirms deletion
+  ansible.builtin.assert:
+    that:
+      - verify_delete.vm_networks | length == 0
+
+# ── Absent idempotency ──
+- name: Remove VM network again (idempotency)
+  microsoft.scvmm.scvmm_vm_network:
+    name: "{{ test_vmnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed
+
+# ── Re-create for teardown ──
+- name: Re-create VM network for teardown
+  microsoft.scvmm.scvmm_vm_network:
+    name: "{{ test_vmnet_name }}"
+    logical_network: "{{ test_ln_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
