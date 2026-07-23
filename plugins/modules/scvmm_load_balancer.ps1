@@ -67,15 +67,15 @@ if ($module.Params.state -eq 'present') {
                             -ObjectType 'Host group' -FailIfNotFound $true
                     })
 
-                $configProvider = Get-SCConfigurationProvider -VMMServer $vmmConnection | Where-Object { $_.Name -eq $module.Params.configuration_provider }
-                if (-not $configProvider) {
-                    $module.FailJson("Configuration provider '$($module.Params.configuration_provider)' not found")
-                }
+                $cpName = $module.Params.configuration_provider
+                $configProvider = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCConfigurationProvider' -Name $cpName `
+                    -ObjectType 'Configuration provider' -FailIfNotFound $true `
+                    -FilterScript { $_.Name -eq $cpName }
 
-                $runAs = Get-SCRunAsAccount -VMMServer $vmmConnection -Name $module.Params.run_as_account -ErrorAction Stop
-                if (-not $runAs) {
-                    $module.FailJson("Run As account '$($module.Params.run_as_account)' not found")
-                }
+                $runAs = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCRunAsAccount' -Name $module.Params.run_as_account `
+                    -ObjectType 'Run As account' -FailIfNotFound $true
 
                 $lb = Add-SCLoadBalancer -VMMServer $vmmConnection `
                     -LoadBalancerAddress $module.Params.address `
@@ -122,10 +122,11 @@ if ($module.Params.state -eq 'present') {
         if ($null -ne $module.Params.configuration_provider) {
             $currentCP = if ($lb.ConfigurationProvider) { $lb.ConfigurationProvider.Name } else { $null }
             if ($currentCP -ne $module.Params.configuration_provider) {
-                $configProvider = Get-SCConfigurationProvider -VMMServer $vmmConnection | Where-Object { $_.Name -eq $module.Params.configuration_provider }
-                if (-not $configProvider) {
-                    $module.FailJson("Configuration provider '$($module.Params.configuration_provider)' not found")
-                }
+                $cpName = $module.Params.configuration_provider
+                $configProvider = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCConfigurationProvider' -Name $cpName `
+                    -ObjectType 'Configuration provider' -FailIfNotFound $true `
+                    -FilterScript { $_.Name -eq $cpName }
                 $needsUpdate = $true
                 $setParams['ConfigurationProvider'] = $configProvider
             }
@@ -133,10 +134,9 @@ if ($module.Params.state -eq 'present') {
         if ($null -ne $module.Params.run_as_account) {
             $currentRA = if ($lb.RunAsAccount) { $lb.RunAsAccount.Name } else { $null }
             if ($currentRA -ne $module.Params.run_as_account) {
-                $runAs = Get-SCRunAsAccount -VMMServer $vmmConnection -Name $module.Params.run_as_account -ErrorAction Stop
-                if (-not $runAs) {
-                    $module.FailJson("Run As account '$($module.Params.run_as_account)' not found")
-                }
+                $runAs = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                    -CmdletName 'Get-SCRunAsAccount' -Name $module.Params.run_as_account `
+                    -ObjectType 'Run As account' -FailIfNotFound $true
                 $needsUpdate = $true
                 $setParams['RunAsAccount'] = $runAs
             }
