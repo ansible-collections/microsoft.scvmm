@@ -72,11 +72,9 @@ if ($module.Params.state -eq 'present') {
                 }
                 if ($null -ne $module.Params.logical_network_definitions -and $module.Params.logical_network_definitions.Count -gt 0) {
                     $lnDefs = @($module.Params.logical_network_definitions | ForEach-Object {
-                            $def = Get-SCLogicalNetworkDefinition -VMMServer $vmmConnection -Name $_ -ErrorAction Stop
-                            if (-not $def) {
-                                $module.FailJson("Logical network definition '$_' not found")
-                            }
-                            $def
+                            Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                                -CmdletName 'Get-SCLogicalNetworkDefinition' -Name $_ `
+                                -ObjectType 'Logical network definition' -FailIfNotFound $true
                         })
                     $newParams['LogicalNetworkDefinition'] = $lnDefs
                 }
@@ -133,20 +131,16 @@ if ($module.Params.state -eq 'present') {
                 $needsUpdate = $true
                 if ($toAdd.Count -gt 0) {
                     $setParams['AddLogicalNetworkDefinition'] = @($toAdd | ForEach-Object {
-                            $def = Get-SCLogicalNetworkDefinition -VMMServer $vmmConnection -Name $_ -ErrorAction Stop
-                            if (-not $def) {
-                                $module.FailJson("Logical network definition '$_' not found")
-                            }
-                            $def
+                            Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                                -CmdletName 'Get-SCLogicalNetworkDefinition' -Name $_ `
+                                -ObjectType 'Logical network definition' -FailIfNotFound $true
                         })
                 }
                 if ($toRemove.Count -gt 0) {
                     $setParams['RemoveLogicalNetworkDefinition'] = @($toRemove | ForEach-Object {
-                            $def = Get-SCLogicalNetworkDefinition -VMMServer $vmmConnection -Name $_ -ErrorAction Stop
-                            if (-not $def) {
-                                $module.FailJson("Logical network definition '$_' not found")
-                            }
-                            $def
+                            Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                                -CmdletName 'Get-SCLogicalNetworkDefinition' -Name $_ `
+                                -ObjectType 'Logical network definition' -FailIfNotFound $true
                         })
                 }
             }
