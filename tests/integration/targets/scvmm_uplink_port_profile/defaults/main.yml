@@ -1,2 +1,5 @@
 ---
 scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_profile_name: Ansible-Test-Uplink-Profile
+test_logical_network: Management
+test_logical_network_definition: Management_0

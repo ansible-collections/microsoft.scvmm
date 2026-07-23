@@ -121,7 +121,7 @@ if ($module.Params.state -eq 'present') {
                 $toRemove = $currentDefs
             }
             elseif ($currentDefs.Count -gt 0 -and $desiredDefs.Count -gt 0) {
-                $diff = Compare-Object -ReferenceObject $currentDefs -DifferenceObject $desiredDefs -ErrorAction SilentlyContinue
+                $diff = Compare-Object -ReferenceObject $currentDefs -DifferenceObject $desiredDefs
                 if ($diff) {
                     $toAdd = @($desiredDefs | Where-Object { $_ -notin $currentDefs })
                     $toRemove = @($currentDefs | Where-Object { $_ -notin $desiredDefs })

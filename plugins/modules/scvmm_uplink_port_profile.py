@@ -91,7 +91,7 @@ uplink_port_profile:
     description:
       description: Profile description.
       type: str
-      returned: when available
+      returned: always
       sample: Host uplink port profile
     enable_network_virtualization:
       description: Whether network virtualization is enabled.
