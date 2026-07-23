@@ -38,22 +38,17 @@ if ($module.Params.name) {
 }
 
 if ($module.Params.logical_network) {
-    try {
-        $ln = Get-SCLogicalNetwork -VMMServer $vmmConnection -Name $module.Params.logical_network -ErrorAction Stop
-    }
-    catch {
-        $ln = $null
-    }
-    if ($ln) {
-        $getParams['LogicalNetwork'] = $ln
-    }
+    $ln = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+        -CmdletName 'Get-SCLogicalNetwork' -Name $module.Params.logical_network `
+        -ObjectType 'Logical network' -FailIfNotFound $true
+    $getParams['LogicalNetwork'] = $ln
 }
 
 try {
     $vmNetworks = @(Get-SCVMNetwork @getParams)
 }
 catch {
-    $vmNetworks = @()
+    $module.FailJson("Failed to query VM networks: $($_.Exception.Message)", $_)
 }
 
 if ($module.Params.name) {
