@@ -1,0 +1,200 @@
+---
+# ============================================================
+# Create
+# ============================================================
+- name: Create IP address pool
+  microsoft.scvmm.scvmm_ip_pool:
+    name: "{{ test_pool_name }}"
+    description: "Test IP pool"
+    logical_network_definition: "{{ test_lnd_name }}"
+    subnet: "{{ test_subnet }}"
+    ip_address_range_start: "10.88.0.10"
+    ip_address_range_end: "10.88.0.200"
+    default_gateways:
+      - "10.88.0.1"
+    dns_servers:
+      - "10.88.0.2"
+    dns_suffix: "test.local"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Verify create result
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.ip_pool.name == test_pool_name
+      - create_result.ip_pool.description == "Test IP pool"
+      - create_result.ip_pool.subnet == test_subnet
+      - create_result.ip_pool.logical_network_definition == test_lnd_name
+
+- name: Verify create with info module
+  microsoft.scvmm.scvmm_ip_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_create
+
+- name: Assert info matches create
+  ansible.builtin.assert:
+    that:
+      - info_after_create.ip_pools | length == 1
+      - info_after_create.ip_pools[0].name == test_pool_name
+      - info_after_create.ip_pools[0].description == "Test IP pool"
+      - info_after_create.ip_pools[0].logical_network_definition == test_lnd_name
+
+- name: Query pools by logical network definition (info)
+  microsoft.scvmm.scvmm_ip_pool_info:
+    logical_network_definition: "{{ test_lnd_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: pools_by_lnd
+
+- name: Assert pool found by LND filter
+  ansible.builtin.assert:
+    that:
+      - pools_by_lnd.ip_pools | length >= 1
+      - test_pool_name in (pools_by_lnd.ip_pools | map(attribute='name') | list)
+
+- name: Query non-existent pool (info)
+  microsoft.scvmm.scvmm_ip_pool_info:
+    name: "NonExistent_IPPool_99999"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_pool
+
+- name: Assert empty result
+  ansible.builtin.assert:
+    that:
+      - no_pool.ip_pools | length == 0
+
+# ============================================================
+# Idempotency
+# ============================================================
+- name: Create IP address pool again (idempotency)
+  microsoft.scvmm.scvmm_ip_pool:
+    name: "{{ test_pool_name }}"
+    description: "Test IP pool"
+    logical_network_definition: "{{ test_lnd_name }}"
+    subnet: "{{ test_subnet }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_again
+
+- name: Verify idempotency
+  ansible.builtin.assert:
+    that:
+      - create_again is not changed
+
+# ============================================================
+# Update
+# ============================================================
+- name: Update IP pool description
+  microsoft.scvmm.scvmm_ip_pool:
+    name: "{{ test_pool_name }}"
+    description: "Updated IP pool"
+    logical_network_definition: "{{ test_lnd_name }}"
+    subnet: "{{ test_subnet }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Verify update result
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+- name: Verify update with info module
+  microsoft.scvmm.scvmm_ip_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_update
+
+- name: Assert info reflects update
+  ansible.builtin.assert:
+    that:
+      - info_after_update.ip_pools[0].description == "Updated IP pool"
+
+# ============================================================
+# Check mode
+# ============================================================
+- name: Delete IP pool (check mode)
+  microsoft.scvmm.scvmm_ip_pool:
+    name: "{{ test_pool_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: delete_check
+
+- name: Verify check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - delete_check is changed
+
+- name: Verify pool still exists after check mode
+  microsoft.scvmm.scvmm_ip_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_check
+
+- name: Assert pool still exists
+  ansible.builtin.assert:
+    that:
+      - info_after_check.ip_pools | length == 1
+
+# ============================================================
+# Delete
+# ============================================================
+- name: Delete IP pool
+  microsoft.scvmm.scvmm_ip_pool:
+    name: "{{ test_pool_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Verify delete result
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+- name: Verify deletion with info module
+  microsoft.scvmm.scvmm_ip_pool_info:
+    name: "{{ test_pool_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_after_delete
+
+- name: Assert pool is gone
+  ansible.builtin.assert:
+    that:
+      - info_after_delete.ip_pools | length == 0
+
+# ============================================================
+# Absent idempotency
+# ============================================================
+- name: Delete IP pool again (idempotency)
+  microsoft.scvmm.scvmm_ip_pool:
+    name: "{{ test_pool_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_again
+
+- name: Verify absent idempotency
+  ansible.builtin.assert:
+    that:
+      - delete_again is not changed
+
+# ============================================================
+# Re-create for teardown verification
+# ============================================================
+- name: Re-create IP pool for teardown
+  microsoft.scvmm.scvmm_ip_pool:
+    name: "{{ test_pool_name }}"
+    logical_network_definition: "{{ test_lnd_name }}"
+    subnet: "{{ test_subnet }}"
+    ip_address_range_start: "10.88.0.10"
+    ip_address_range_end: "10.88.0.200"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: recreate_result
+
+- name: Verify re-create
+  ansible.builtin.assert:
+    that:
+      - recreate_result is changed
