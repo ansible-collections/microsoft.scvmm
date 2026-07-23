@@ -1,0 +1,176 @@
+---
+# ── Create definition ──
+- name: Create logical network definition
+  microsoft.scvmm.scvmm_logical_network_definition:
+    name: "{{ test_def_name }}"
+    logical_network: "{{ test_ln_name }}"
+    subnet_vlans:
+      - subnet: "{{ test_subnet }}"
+        vlan_id: "{{ test_vlan_id | int }}"
+    host_groups:
+      - All Hosts
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert definition was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.logical_network_definition.name == test_def_name
+      - create_result.logical_network_definition.logical_network == test_ln_name
+      - create_result.logical_network_definition.id is defined
+      - create_result.logical_network_definition.id | length > 0
+      - create_result.logical_network_definition.subnet_vlans | length == 1
+      - create_result.logical_network_definition.host_groups | length >= 1
+
+# ── Verify creation with info module ──
+- name: Verify definition via info module
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    name: "{{ test_def_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created definition
+  ansible.builtin.assert:
+    that:
+      - verify_create.logical_network_definitions | length == 1
+      - verify_create.logical_network_definitions[0].name == test_def_name
+      - verify_create.logical_network_definitions[0].logical_network == test_ln_name
+      - verify_create.logical_network_definitions[0].id == create_result.logical_network_definition.id
+
+# ── Info: query by logical network ──
+- name: Get definitions by logical network
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    logical_network: "{{ test_ln_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_ln
+
+- name: Assert query by logical network returns test definition
+  ansible.builtin.assert:
+    that:
+      - by_ln.logical_network_definitions | length >= 1
+      - test_def_name in (by_ln.logical_network_definitions | map(attribute='name') | list)
+
+# ── Info: query all ──
+- name: Get all definitions
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_defs
+
+- name: Assert test definition appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_defs.logical_network_definitions | length > 0
+      - test_def_name in (all_defs.logical_network_definitions | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Query non-existent definition
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    name: "NonExistent_Def_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.logical_network_definitions | length == 0
+
+# ── Idempotency ──
+- name: Create same definition again (idempotency)
+  microsoft.scvmm.scvmm_logical_network_definition:
+    name: "{{ test_def_name }}"
+    logical_network: "{{ test_ln_name }}"
+    subnet_vlans:
+      - subnet: "{{ test_subnet }}"
+        vlan_id: "{{ test_vlan_id | int }}"
+    host_groups:
+      - All Hosts
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Check mode: update ──
+- name: Update definition in check mode with different subnet
+  microsoft.scvmm.scvmm_logical_network_definition:
+    name: "{{ test_def_name }}"
+    logical_network: "{{ test_ln_name }}"
+    subnet_vlans:
+      - subnet: "172.16.0.0/24"
+        vlan_id: 200
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify check mode did not change definition
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    name: "{{ test_def_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert subnet unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - after_check.logical_network_definitions[0].subnet_vlans | length == 1
+
+# ── Delete definition ──
+- name: Remove definition
+  microsoft.scvmm.scvmm_logical_network_definition:
+    name: "{{ test_def_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert definition was removed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify deletion via info module
+  microsoft.scvmm.scvmm_logical_network_definition_info:
+    name: "{{ test_def_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module confirms deletion
+  ansible.builtin.assert:
+    that:
+      - verify_delete.logical_network_definitions | length == 0
+
+# ── Absent idempotency ──
+- name: Remove definition again (idempotency)
+  microsoft.scvmm.scvmm_logical_network_definition:
+    name: "{{ test_def_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed
+
+# ── Re-create for teardown validation ──
+- name: Re-create definition for teardown
+  microsoft.scvmm.scvmm_logical_network_definition:
+    name: "{{ test_def_name }}"
+    logical_network: "{{ test_ln_name }}"
+    subnet_vlans:
+      - subnet: "{{ test_subnet }}"
+        vlan_id: "{{ test_vlan_id | int }}"
+    host_groups:
+      - All Hosts
+    state: present
+    vmm_server: "{{ scvmm_server }}"
