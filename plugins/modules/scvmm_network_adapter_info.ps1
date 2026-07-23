@@ -27,7 +27,9 @@ $propertyMap = @(
     @{ Param = "mac_address_type"; Property = "MACAddressType"; Type = "enum" }
 )
 
-$vm = Get-SCVirtualMachine -VMMServer $vmmConnection -Name $module.Params.vm_name -ErrorAction SilentlyContinue
+$vm = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+    -CmdletName 'Get-SCVirtualMachine' -Name $module.Params.vm_name `
+    -ObjectType 'Virtual machine'
 if (-not $vm) {
     $module.Result.network_adapters = @()
     $module.ExitJson()

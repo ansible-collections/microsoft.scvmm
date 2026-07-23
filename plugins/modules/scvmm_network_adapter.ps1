@@ -43,6 +43,12 @@ $propertyMap = @(
     @{ Param = "mac_address_type"; Property = "MACAddressType"; Type = "enum" }
 )
 
+$createMap = @(
+    @{ Param = "mac_address_type"; Property = "MACAddressType"; Type = "enum" }
+    @{ Param = "mac_address"; Property = "MACAddress"; Type = "string" }
+    @{ Param = "ipv4_address_type"; Property = "IPv4AddressType"; Type = "enum" }
+)
+
 function Get-AdapterResult {
     param($Adapter, $VMName)
     $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $Adapter
@@ -52,12 +58,11 @@ function Get-AdapterResult {
     return $result
 }
 
-$vm = Get-SCVMMVirtualMachine -Module $module -VMMConnection $vmmConnection -Name $module.Params.vm_name
+$vm = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+    -CmdletName 'Get-SCVirtualMachine' -Name $module.Params.vm_name `
+    -ObjectType 'Virtual machine' -FailIfNotFound ($module.Params.state -ne 'absent')
 if (-not $vm) {
-    if ($module.Params.state -eq 'absent') {
-        $module.ExitJson()
-    }
-    $module.FailJson("VM '$($module.Params.vm_name)' not found")
+    $module.ExitJson()
 }
 
 $adapters = @(Get-SCVirtualNetworkAdapter -VM $vm -ErrorAction Stop)
@@ -81,23 +86,17 @@ if ($module.Params.state -eq 'present') {
                     ErrorAction = 'Stop'
                 }
                 if ($module.Params.vm_network) {
-                    $vmNet = Get-SCVMNetwork -VMMServer $vmmConnection -Name $module.Params.vm_network -ErrorAction Stop
-                    if (-not $vmNet) {
-                        $module.FailJson("VM network '$($module.Params.vm_network)' not found")
-                    }
+                    $vmNet = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                        -CmdletName 'Get-SCVMNetwork' -Name $module.Params.vm_network `
+                        -ObjectType 'VM network' -FailIfNotFound $true
                     $newParams['VMNetwork'] = $vmNet
                 }
                 else {
                     $newParams['NoConnection'] = $true
                 }
-                if ($null -ne $module.Params.mac_address_type) {
-                    $newParams['MACAddressType'] = $module.Params.mac_address_type
-                }
-                if ($null -ne $module.Params.mac_address) {
-                    $newParams['MACAddress'] = $module.Params.mac_address
-                }
-                if ($null -ne $module.Params.ipv4_address_type) {
-                    $newParams['IPv4AddressType'] = $module.Params.ipv4_address_type
+                $createParams = Get-SCVMMParametersFromMap -PropertyMap $createMap -AnsibleParams $module.Params
+                foreach ($key in $createParams.Keys) {
+                    $newParams[$key] = $createParams[$key]
                 }
 
                 $adapter = New-SCVirtualNetworkAdapter @newParams

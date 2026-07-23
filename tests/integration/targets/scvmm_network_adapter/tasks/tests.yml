@@ -1,4 +1,5 @@
 ---
+# --- Get initial adapter state ---
 - name: Get initial adapters via info module
   microsoft.scvmm.scvmm_network_adapter_info:
     vm_name: "{{ test_vm }}"
@@ -9,7 +10,7 @@
   ansible.builtin.set_fact:
     initial_count: "{{ initial_adapters.network_adapters | length }}"
 
-# --- Add adapter (no connection) ---
+# --- Add disconnected adapter ---
 - name: Add network adapter (no connection)
   microsoft.scvmm.scvmm_network_adapter:
     vm_name: "{{ test_vm }}"
@@ -17,7 +18,7 @@
     state: present
   register: add_nic
 
-- name: Assert adapter added
+- name: Assert disconnected adapter added
   ansible.builtin.assert:
     that:
       - add_nic.changed == true
@@ -25,44 +26,246 @@
       - add_nic.network_adapter.id is defined
       - add_nic.network_adapter.vm_name == test_vm
       - add_nic.network_adapter.is_synthetic == true
+      - add_nic.network_adapter.mac_address is defined
+      - add_nic.network_adapter.mac_address_type is defined
 
-- name: Verify adapter count increased via info module
+# --- Info module field assertions on disconnected adapter ---
+- name: Get adapters after disconnected add
   microsoft.scvmm.scvmm_network_adapter_info:
     vm_name: "{{ test_vm }}"
     vmm_server: "{{ scvmm_server }}"
-  register: after_add
+  register: after_disconnected_add
 
-- name: Assert adapter count increased
+- name: Assert adapter count increased and info fields present
   ansible.builtin.assert:
     that:
-      - after_add.network_adapters | length == (initial_count | int) + 1
+      - after_disconnected_add.network_adapters | length == (initial_count | int) + 1
+      - after_disconnected_add.network_adapters[-1].id is defined
+      - after_disconnected_add.network_adapters[-1].vm_name == test_vm
+      - after_disconnected_add.network_adapters[-1].mac_address is defined
+      - after_disconnected_add.network_adapters[-1].mac_address_type is defined
+      - after_disconnected_add.network_adapters[-1].ipv4_addresses is defined
+      - after_disconnected_add.network_adapters[-1].is_synthetic == true
 
-# --- Check mode add ---
-- name: Check mode - add another adapter
+# --- Remove the disconnected adapter ---
+- name: Remove disconnected adapter
   microsoft.scvmm.scvmm_network_adapter:
     vm_name: "{{ test_vm }}"
     vmm_server: "{{ scvmm_server }}"
-    state: present
-  check_mode: true
-  register: check_add
+    state: absent
+  register: remove_disconnected
 
-- name: Assert check mode reports changed
+- name: Assert disconnected adapter removed
   ansible.builtin.assert:
     that:
-      - check_add.changed == true
+      - remove_disconnected.changed == true
 
-- name: Verify check mode did not add adapter
+- name: Verify adapter count back to initial
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_remove_disconnected
+
+- name: Assert adapter count restored
+  ansible.builtin.assert:
+    that:
+      - after_remove_disconnected.network_adapters | length == (initial_count | int)
+
+# --- Add adapter connected to VM network ---
+- name: Add adapter connected to VM network
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: add_connected
+
+- name: Assert connected adapter added with vm_network
+  ansible.builtin.assert:
+    that:
+      - add_connected.changed == true
+      - add_connected.network_adapter.id is defined
+      - add_connected.network_adapter.vm_name == test_vm
+      - add_connected.network_adapter.vm_network == test_vmnet_name
+      - add_connected.network_adapter.is_synthetic == true
+      - add_connected.network_adapter.mac_address is defined
+      - add_connected.network_adapter.mac_address_type is defined
+      - add_connected.network_adapter.ipv4_addresses is defined
+
+# --- Info module assertions on connected adapter ---
+- name: Get adapters after connected add
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_connected_add
+
+- name: Find the connected adapter in info results
+  ansible.builtin.set_fact:
+    connected_adapter_info: "{{ after_connected_add.network_adapters | selectattr('vm_network', 'equalto', test_vmnet_name) | list }}"
+
+- name: Assert connected adapter found in info with all fields
+  ansible.builtin.assert:
+    that:
+      - connected_adapter_info | length == 1
+      - connected_adapter_info[0].id is defined
+      - connected_adapter_info[0].vm_name == test_vm
+      - connected_adapter_info[0].vm_network == test_vmnet_name
+      - connected_adapter_info[0].mac_address is defined
+      - connected_adapter_info[0].mac_address_type is defined
+      - connected_adapter_info[0].ipv4_addresses is defined
+      - connected_adapter_info[0].is_synthetic == true
+
+# --- Idempotency: adding same vm_network again should not change ---
+- name: Add adapter with same vm_network again (idempotent)
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: add_connected_idem
+
+- name: Assert idempotent add reports no change
+  ansible.builtin.assert:
+    that:
+      - add_connected_idem.changed == false
+      - add_connected_idem.network_adapter.vm_network == test_vmnet_name
+
+# --- Remove connected adapter by vm_network ---
+- name: Remove adapter connected to VM network
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_connected
+
+- name: Assert connected adapter removed
+  ansible.builtin.assert:
+    that:
+      - remove_connected.changed == true
+
+- name: Verify connected adapter gone via info
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_remove_connected
+
+- name: Assert no adapter connected to test VM network
+  ansible.builtin.assert:
+    that:
+      - after_remove_connected.network_adapters | selectattr('vm_network', 'equalto', test_vmnet_name) | list | length == 0
+
+# --- Add adapter with mac_address_type=Dynamic ---
+- name: Add adapter with Dynamic MAC address type
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Dynamic
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: add_dynamic_mac
+
+- name: Assert adapter added with Dynamic MAC
+  ansible.builtin.assert:
+    that:
+      - add_dynamic_mac.changed == true
+      - add_dynamic_mac.network_adapter.mac_address_type == "Dynamic"
+      - add_dynamic_mac.network_adapter.mac_address is defined
+      - add_dynamic_mac.network_adapter.vm_network == test_vmnet_name
+
+# --- Cleanup dynamic MAC adapter ---
+- name: Remove dynamic MAC adapter
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+
+# --- Add adapter with mac_address_type=Static and mac_address ---
+- name: Add adapter with static MAC address
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Static
+    mac_address: "00:1A:2B:3C:4D:5E"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: add_static_mac
+
+- name: Assert adapter added with static MAC
+  ansible.builtin.assert:
+    that:
+      - add_static_mac.changed == true
+      - add_static_mac.network_adapter.mac_address_type == "Static"
+      - add_static_mac.network_adapter.mac_address == "00:1A:2B:3C:4D:5E"
+
+# --- Cleanup static MAC adapter ---
+- name: Remove static MAC adapter
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+
+# --- Check mode: add connected adapter ---
+- name: Check mode - add connected adapter
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_add_connected
+
+- name: Assert check mode reports changed for connected add
+  ansible.builtin.assert:
+    that:
+      - check_add_connected.changed == true
+
+- name: Verify check mode did not add connected adapter
   microsoft.scvmm.scvmm_network_adapter_info:
     vm_name: "{{ test_vm }}"
     vmm_server: "{{ scvmm_server }}"
   register: check_add_verify
 
+- name: Assert no adapter connected to test VM network after check mode
+  ansible.builtin.assert:
+    that:
+      - check_add_verify.network_adapters | selectattr('vm_network', 'equalto', test_vmnet_name) | list | length == 0
+
+# --- Check mode: add disconnected adapter ---
+- name: Check mode - add disconnected adapter
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_add_disconnected
+
+- name: Assert check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - check_add_disconnected.changed == true
+
+- name: Verify check mode did not add adapter
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: check_add_disconnected_verify
+
 - name: Assert adapter count unchanged after check mode
   ansible.builtin.assert:
     that:
-      - check_add_verify.network_adapters | length == (initial_count | int) + 1
+      - check_add_disconnected_verify.network_adapters | length == (initial_count | int)
 
-# --- Check mode remove ---
+# --- Add an adapter so we can test check mode remove ---
+- name: Add adapter for check mode remove test
+  microsoft.scvmm.scvmm_network_adapter:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+
+# --- Check mode: remove adapter ---
 - name: Check mode - remove adapter
   microsoft.scvmm.scvmm_network_adapter:
     vm_name: "{{ test_vm }}"
@@ -71,7 +274,7 @@
   check_mode: true
   register: check_remove
 
-- name: Assert check mode reports changed
+- name: Assert check mode reports changed for remove
   ansible.builtin.assert:
     that:
       - check_remove.changed == true
@@ -82,34 +285,17 @@
     vmm_server: "{{ scvmm_server }}"
   register: check_remove_verify
 
-- name: Assert adapter still exists after check mode
+- name: Assert adapter still exists after check mode remove
   ansible.builtin.assert:
     that:
       - check_remove_verify.network_adapters | length == (initial_count | int) + 1
 
-# --- Remove the adapter we added ---
-- name: Remove last network adapter
+# --- Cleanup the adapter added for check mode test ---
+- name: Remove adapter added for check mode test
   microsoft.scvmm.scvmm_network_adapter:
     vm_name: "{{ test_vm }}"
     vmm_server: "{{ scvmm_server }}"
     state: absent
-  register: remove_nic
-
-- name: Assert adapter removed
-  ansible.builtin.assert:
-    that:
-      - remove_nic.changed == true
-
-- name: Verify adapter count back to initial
-  microsoft.scvmm.scvmm_network_adapter_info:
-    vm_name: "{{ test_vm }}"
-    vmm_server: "{{ scvmm_server }}"
-  register: after_remove
-
-- name: Assert adapter count restored
-  ansible.builtin.assert:
-    that:
-      - after_remove.network_adapters | length == (initial_count | int)
 
 # --- Absent on non-existent VM is safe (idempotent) ---
 - name: Remove adapter from non-existent VM (safe no-op)
