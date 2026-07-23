@@ -43,6 +43,7 @@ $propertyMap = @(
     @{ Param = "manufacturer"; Property = "Manufacturer"; Type = "string" }
     @{ Param = "model"; Property = "Model"; Type = "string" }
     @{ Param = "configuration_provider"; Property = "ConfigurationProvider"; Type = "nested_name" }
+    @{ Param = "run_as_account"; Property = "RunAsAccount"; Type = "nested_name" }
     @{ Param = "host_groups"; Property = "HostGroups"; Type = "name_list" }
 )
 
@@ -61,9 +62,9 @@ if ($module.Params.state -eq 'present') {
         if (-not $module.CheckMode) {
             try {
                 $hostGroups = @($module.Params.host_groups | ForEach-Object {
-                        $hg = Get-SCVMHostGroup -VMMServer $vmmConnection -Name $_ -ErrorAction Stop
-                        if (-not $hg) { $module.FailJson("Host group '$_' not found") }
-                        $hg
+                        Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                            -CmdletName 'Get-SCVMHostGroup' -Name $_ `
+                            -ObjectType 'Host group' -FailIfNotFound $true
                     })
 
                 $configProvider = Get-SCConfigurationProvider -VMMServer $vmmConnection | Where-Object { $_.Name -eq $module.Params.configuration_provider }
@@ -100,6 +101,7 @@ if ($module.Params.state -eq 'present') {
                 manufacturer = $module.Params.manufacturer
                 model = $module.Params.model
                 configuration_provider = $module.Params.configuration_provider
+                run_as_account = $module.Params.run_as_account
                 host_groups = if ($module.Params.host_groups) { @($module.Params.host_groups) } else { @() }
             }
             $module.Diff.after = $module.Result.load_balancer
@@ -110,10 +112,57 @@ if ($module.Params.state -eq 'present') {
 
         $needsUpdate = Test-SCVMMPropertiesChanged -PropertyMap $updateMap `
             -CurrentObject $lb -AnsibleParams $module.Params
+        $setParams = @{}
 
         if ($needsUpdate) {
             $setParams = Get-SCVMMParametersFromMap -PropertyMap $updateMap `
                 -AnsibleParams $module.Params -CurrentObject $lb
+        }
+
+        if ($null -ne $module.Params.configuration_provider) {
+            $currentCP = if ($lb.ConfigurationProvider) { $lb.ConfigurationProvider.Name } else { $null }
+            if ($currentCP -ne $module.Params.configuration_provider) {
+                $configProvider = Get-SCConfigurationProvider -VMMServer $vmmConnection | Where-Object { $_.Name -eq $module.Params.configuration_provider }
+                if (-not $configProvider) {
+                    $module.FailJson("Configuration provider '$($module.Params.configuration_provider)' not found")
+                }
+                $needsUpdate = $true
+                $setParams['ConfigurationProvider'] = $configProvider
+            }
+        }
+        if ($null -ne $module.Params.run_as_account) {
+            $currentRA = if ($lb.RunAsAccount) { $lb.RunAsAccount.Name } else { $null }
+            if ($currentRA -ne $module.Params.run_as_account) {
+                $runAs = Get-SCRunAsAccount -VMMServer $vmmConnection -Name $module.Params.run_as_account -ErrorAction Stop
+                if (-not $runAs) {
+                    $module.FailJson("Run As account '$($module.Params.run_as_account)' not found")
+                }
+                $needsUpdate = $true
+                $setParams['RunAsAccount'] = $runAs
+            }
+        }
+        if ($null -ne $module.Params.host_groups) {
+            $currentHGs = @($lb.HostGroups | ForEach-Object { $_.Name }) | Sort-Object
+            $desiredHGs = @($module.Params.host_groups) | Sort-Object
+            $hgChanged = $false
+            if ($currentHGs.Count -ne $desiredHGs.Count) {
+                $hgChanged = $true
+            }
+            elseif ($currentHGs.Count -gt 0) {
+                $diff = Compare-Object -ReferenceObject $currentHGs -DifferenceObject $desiredHGs -ErrorAction SilentlyContinue
+                if ($diff) { $hgChanged = $true }
+            }
+            if ($hgChanged) {
+                $needsUpdate = $true
+                $setParams['VMHostGroup'] = @($module.Params.host_groups | ForEach-Object {
+                        Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                            -CmdletName 'Get-SCVMHostGroup' -Name $_ `
+                            -ObjectType 'Host group' -FailIfNotFound $true
+                    })
+            }
+        }
+
+        if ($needsUpdate) {
             $module.Result.changed = $true
             if (-not $module.CheckMode) {
                 $setParams['LoadBalancer'] = $lb
@@ -129,9 +178,19 @@ if ($module.Params.state -eq 'present') {
 
         $module.Result.load_balancer = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $lb
         if ($needsUpdate -and $module.CheckMode) {
-            $module.Diff.after = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
+            $projected = Get-SCVMMCheckModeDiff -Before $module.Diff.before `
                 -UpdateMap $updateMap -AnsibleParams $module.Params `
                 -CurrentObject $lb
+            if ($null -ne $module.Params.configuration_provider) {
+                $projected['configuration_provider'] = $module.Params.configuration_provider
+            }
+            if ($null -ne $module.Params.run_as_account) {
+                $projected['run_as_account'] = $module.Params.run_as_account
+            }
+            if ($null -ne $module.Params.host_groups) {
+                $projected['host_groups'] = @($module.Params.host_groups)
+            }
+            $module.Diff.after = $projected
         }
         else {
             $module.Diff.after = $module.Result.load_balancer
