@@ -98,11 +98,10 @@ if ($module.Params.state -eq 'present') {
                     $newParams['Description'] = $module.Params.description
                 }
                 if ($module.Params.logical_network_definition) {
-                    $lnd = Get-SCLogicalNetworkDefinition -VMMServer $vmmConnection `
-                        -Name $module.Params.logical_network_definition -ErrorAction Stop
-                    if (-not $lnd) {
-                        $module.FailJson("Logical network definition '$($module.Params.logical_network_definition)' not found")
-                    }
+                    $lnd = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                        -CmdletName 'Get-SCLogicalNetworkDefinition' `
+                        -Name $module.Params.logical_network_definition `
+                        -ObjectType 'Logical network definition' -FailIfNotFound $true
                     $newParams['LogicalNetworkDefinition'] = $lnd
                 }
 
