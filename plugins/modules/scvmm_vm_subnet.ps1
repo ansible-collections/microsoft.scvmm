@@ -59,7 +59,9 @@ function Get-SubnetResult {
 $vmSubnet = $null
 $vmNet = $null
 if ($module.Params.vm_network) {
-    $vmNet = Get-SCVMNetwork -VMMServer $vmmConnection -Name $module.Params.vm_network -ErrorAction SilentlyContinue
+    $vmNet = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+        -CmdletName 'Get-SCVMNetwork' -Name $module.Params.vm_network `
+        -ObjectType 'VM network'
     if ($vmNet) {
         $subnets = @(Get-SCVMSubnet -VMMServer $vmmConnection -VMNetwork $vmNet -ErrorAction Stop)
         $vmSubnet = $subnets | Where-Object { $_.Name -eq $module.Params.name } | Select-Object -First 1
@@ -78,10 +80,9 @@ if ($module.Params.state -eq 'present') {
         if (-not $module.CheckMode) {
             try {
                 if (-not $vmNet) {
-                    $vmNet = Get-SCVMNetwork -VMMServer $vmmConnection -Name $module.Params.vm_network -ErrorAction Stop
-                    if (-not $vmNet) {
-                        $module.FailJson("VM network '$($module.Params.vm_network)' not found")
-                    }
+                    $vmNet = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+                        -CmdletName 'Get-SCVMNetwork' -Name $module.Params.vm_network `
+                        -ObjectType 'VM network' -FailIfNotFound $true
                 }
 
                 $subnetVlan = New-SCSubnetVLan -Subnet $module.Params.subnet -VLanID $module.Params.vlan_id

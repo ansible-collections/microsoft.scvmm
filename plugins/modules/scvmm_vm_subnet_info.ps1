@@ -29,7 +29,9 @@ $propertyMap = @(
 )
 
 if ($module.Params.vm_network) {
-    $vmNet = Get-SCVMNetwork -VMMServer $vmmConnection -Name $module.Params.vm_network -ErrorAction Stop
+    $vmNet = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `
+        -CmdletName 'Get-SCVMNetwork' -Name $module.Params.vm_network `
+        -ObjectType 'VM network'
     if (-not $vmNet) {
         $module.Result.vm_subnets = @()
         $module.ExitJson()
