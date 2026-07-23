@@ -1,5 +1,36 @@
 ---
 # ============================================================
+# Check-mode create
+# ============================================================
+- name: Create VM subnet in check mode
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    description: "Test VM subnet"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_create
+
+- name: Assert check-mode create reports changed
+  ansible.builtin.assert:
+    that:
+      - check_create is changed
+      - check_create.vm_subnet.name == test_subnet_name
+
+- name: Verify subnet does not exist after check-mode create
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert subnet was not actually created
+  ansible.builtin.assert:
+    that:
+      - after_check_create.vm_subnets | length == 0
+
+# ============================================================
 # Create
 # ============================================================
 - name: Create VM subnet
@@ -104,6 +135,96 @@
   ansible.builtin.assert:
     that:
       - info_after_update.vm_subnets[0].description == "Updated VM subnet"
+
+# ============================================================
+# Update idempotency
+# ============================================================
+- name: Update VM subnet description again (idempotency)
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    description: "Updated VM subnet"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_idem
+
+- name: Verify update idempotency
+  ansible.builtin.assert:
+    that:
+      - update_idem is not changed
+
+# ============================================================
+# VLAN ID
+# ============================================================
+- name: Delete subnet to recreate with vlan_id
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Create VM subnet with vlan_id
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    vlan_id: "{{ test_vlan_id | int }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_vlan
+
+- name: Assert subnet created with vlan_id
+  ansible.builtin.assert:
+    that:
+      - create_vlan is changed
+      - create_vlan.vm_subnet.subnet_vlans | length >= 1
+
+- name: Verify vlan_id via info module
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_vlan
+
+- name: Assert vlan_id is set correctly
+  ansible.builtin.assert:
+    that:
+      - info_vlan.vm_subnets[0].subnet_vlans | length >= 1
+
+# ============================================================
+# Logical network definition
+# ============================================================
+- name: Delete subnet to recreate with logical_network_definition
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Create VM subnet with logical_network_definition
+  microsoft.scvmm.scvmm_vm_subnet:
+    name: "{{ test_subnet_name }}"
+    vm_network: "{{ test_vmnet_name }}"
+    subnet: "{{ test_subnet_cidr }}"
+    logical_network_definition: "{{ test_logical_network_definition }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_lnd
+
+- name: Assert subnet created with logical_network_definition
+  ansible.builtin.assert:
+    that:
+      - create_lnd is changed
+      - create_lnd.vm_subnet.logical_network_definition == test_logical_network_definition
+
+- name: Verify logical_network_definition via info module
+  microsoft.scvmm.scvmm_vm_subnet_info:
+    name: "{{ test_subnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_lnd
+
+- name: Assert info shows logical_network_definition
+  ansible.builtin.assert:
+    that:
+      - info_lnd.vm_subnets[0].logical_network_definition == test_logical_network_definition
 
 # ============================================================
 # Check mode

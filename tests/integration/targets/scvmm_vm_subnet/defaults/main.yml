@@ -1,2 +1,7 @@
 ---
 scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_subnet_name: Ansible-Test-VMSubnet
+test_vmnet_name: VM-Network
+test_subnet_cidr: "10.99.0.0/24"
+test_vlan_id: 100
+test_logical_network_definition: Management_0

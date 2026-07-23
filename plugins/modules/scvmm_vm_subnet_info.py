@@ -62,6 +62,13 @@ vm_subnets:
       description: List of subnet/VLAN associations.
       type: list
       elements: dict
+      contains:
+        subnet:
+          description: Subnet in CIDR notation.
+          type: str
+        vlan_id:
+          description: VLAN ID.
+          type: int
     logical_network_definition:
       description: Associated logical network definition name.
       type: str

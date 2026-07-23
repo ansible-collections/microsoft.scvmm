@@ -24,12 +24,12 @@ options:
   vm_network:
     description:
       - Name of the VM network to associate with this subnet.
-      - Required when creating a new VM subnet.
+      - Required when O(state=present).
     type: str
   subnet:
     description:
       - Subnet in CIDR notation (e.g. 10.0.0.0/24).
-      - Required when creating a new VM subnet.
+      - Required when O(state=present).
     type: str
   vlan_id:
     description:
