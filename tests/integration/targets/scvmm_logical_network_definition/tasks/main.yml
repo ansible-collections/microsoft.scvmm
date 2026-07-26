@@ -1,0 +1,41 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_ln_name: "AnsibleTest_LNDef_LN_{{ 99999 | random }}"
+    test_def_name: "AnsibleTest_LNDef_{{ 99999 | random }}"
+    test_subnet: "10.{{ 254 | random }}.{{ 254 | random }}.0/24"
+    test_vlan_id: "{{ range(100, 999) | random }}"
+
+- block:
+    - name: Setup - Create logical network via PowerShell
+      ansible.windows.win_shell: |
+        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
+        New-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -ErrorAction Stop | Out-Null
+        "created"
+      register: ln_setup
+
+    - name: Assert logical network created
+      ansible.builtin.assert:
+        that:
+          - "'created' in ln_setup.stdout"
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test definition
+      microsoft.scvmm.scvmm_logical_network_definition:
+        name: "{{ test_def_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove logical network via PowerShell
+      ansible.windows.win_shell: |
+        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
+        $ln = Get-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -ErrorAction SilentlyContinue
+        if ($ln) {
+          Get-SCLogicalNetworkDefinition -LogicalNetwork $ln | Remove-SCLogicalNetworkDefinition -Force -ErrorAction SilentlyContinue | Out-Null
+          Remove-SCLogicalNetwork -LogicalNetwork $ln -Force -ErrorAction SilentlyContinue | Out-Null
+        }
+      ignore_errors: true
