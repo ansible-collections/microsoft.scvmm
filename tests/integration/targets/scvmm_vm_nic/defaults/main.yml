@@ -1,0 +1,4 @@
+---
+scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_vm_host: WIN-5UL8TNLBCNF.scvmm.local
+test_vm_template: BlankVM-Gen2

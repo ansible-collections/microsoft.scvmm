@@ -61,6 +61,15 @@ network_adapters:
       description: IPv4 addresses.
       type: list
       elements: str
+    vlan_enabled:
+      description: Whether VLAN tagging is enabled.
+      type: bool
+    vlan_id:
+      description: VLAN ID.
+      type: int
+    port_classification:
+      description: Port classification name.
+      type: str
     is_synthetic:
       description: Whether the adapter is synthetic.
       type: bool
