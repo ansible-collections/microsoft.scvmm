@@ -7,14 +7,23 @@
     test_subnet: "10.88.0.0/24"
 
 - block:
-    - name: Setup - Create logical network and definition via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
-        $ln = New-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -ErrorAction Stop
-        $hg = Get-SCVMHostGroup -VMMServer $vmmServer -Name "All Hosts"
-        $subnetVlan = New-SCSubnetVLan -Subnet "{{ test_subnet }}" -VLanID 0
-        New-SCLogicalNetworkDefinition -Name "{{ test_lnd_name }}" -LogicalNetwork $ln -VMHostGroup $hg -SubnetVLan $subnetVlan -ErrorAction Stop | Out-Null
-        "created"
+    - name: Setup - Create logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Setup - Create logical network definition
+      microsoft.scvmm.scvmm_logical_network_definition:
+        name: "{{ test_lnd_name }}"
+        logical_network: "{{ test_ln_name }}"
+        host_groups:
+          - All Hosts
+        subnet_vlans:
+          - subnet: "{{ test_subnet }}"
+            vlan_id: 0
+        state: present
+        vmm_server: "{{ scvmm_server }}"
 
     - name: Run tests
       ansible.builtin.include_tasks: tests.yml
@@ -26,18 +35,17 @@
         vmm_server: "{{ scvmm_server }}"
       ignore_errors: true
 
-    - name: Teardown - Remove logical network definition and network via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
-        $lnd = Get-SCLogicalNetworkDefinition -VMMServer $vmmServer -Name "{{ test_lnd_name }}"
-        if ($lnd) {
-          Get-SCStaticIPAddressPool -LogicalNetworkDefinition $lnd | ForEach-Object { Remove-SCStaticIPAddressPool -StaticIPAddressPool $_ -Force | Out-Null }
-          Remove-SCLogicalNetworkDefinition -LogicalNetworkDefinition $lnd -Force | Out-Null
-        }
-        $ln = Get-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}"
-        if ($ln) {
-          Get-SCLogicalNetworkDefinition -LogicalNetwork $ln | ForEach-Object { Remove-SCLogicalNetworkDefinition -LogicalNetworkDefinition $_ -Force | Out-Null }
-          Remove-SCLogicalNetwork -LogicalNetwork $ln -Force | Out-Null
-        }
-        "done"
+    - name: Teardown - Remove logical network definition
+      microsoft.scvmm.scvmm_logical_network_definition:
+        name: "{{ test_lnd_name }}"
+        logical_network: "{{ test_ln_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
       ignore_errors: true

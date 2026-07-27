@@ -23,14 +23,13 @@
     original_adapter_logical_networks: "{{ [original_state.adapter.logical_networks | default([])] | flatten }}"
 
 - name: Find an available logical network
-  ansible.windows.win_shell: |
-    $ln = Get-SCLogicalNetwork -VMMServer (Get-SCVMMServer "{{ scvmm_server }}") | Select-Object -First 1
-    if ($ln) { $ln.Name } else { "" }
+  microsoft.scvmm.scvmm_logical_network_info:
+    vmm_server: "{{ scvmm_server }}"
   register: ln_lookup
 
 - name: Store logical network name
   ansible.builtin.set_fact:
-    test_logical_network: "{{ ln_lookup.stdout | trim }}"
+    test_logical_network: "{{ (ln_lookup.logical_networks | first).name | default('') }}"
 
 - block:
     - name: Run tests
