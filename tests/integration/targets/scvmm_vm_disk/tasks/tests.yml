@@ -1,0 +1,942 @@
+---
+# ============================================================
+# Info module - query existing disk drives (Get-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Info - Query disk drives on test VM
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: initial_disks
+
+- name: Assert initial disk info returned with all fields
+  assert:
+    that:
+      - initial_disks.disk_drives is defined
+      - initial_disks.disk_drives | type_debug == 'list'
+      - initial_disks.disk_drives | length > 0
+      - initial_disks.disk_drives[0].id is defined
+      - initial_disks.disk_drives[0].vm_name == test_vm
+      - initial_disks.disk_drives[0].bus_type is defined
+      - initial_disks.disk_drives[0].bus is defined
+      - initial_disks.disk_drives[0].lun is defined
+      - initial_disks.disk_drives[0].vhd_name is defined
+      - initial_disks.disk_drives[0].vhd_location is defined
+      - initial_disks.disk_drives[0].vhd_format is defined
+      - initial_disks.disk_drives[0].vhd_type is defined
+      - initial_disks.disk_drives[0].size_gb is defined
+      - initial_disks.disk_drives[0].shared_storage is defined
+      - initial_disks.disk_drives[0].volume_type is defined
+      - initial_disks.disk_drives[0].enabled is defined
+
+- name: Save initial disk count
+  ansible.builtin.set_fact:
+    initial_disk_count: "{{ initial_disks.disk_drives | length }}"
+
+# ============================================================
+# Check mode - create new disk (New-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Check mode - Create new 5 GB disk
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    size_gb: 5
+    vhd_format: VHDX
+    vhd_type: Dynamic
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_create.changed == true
+      - check_create.vm_disk.bus_type == 'SCSI'
+      - check_create.vm_disk.bus == 0
+      - check_create.vm_disk.lun == 1
+
+- name: Verify check mode did not create disk
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_create
+
+- name: Assert disk was not actually created
+  assert:
+    that:
+      - post_check_create.disk_drives | selectattr('lun', 'equalto', 1) | list | length == 0
+
+# ============================================================
+# Create new disk with size_gb (New-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Create new 5 GB dynamic VHDX disk at SCSI 0:1
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    size_gb: 5
+    vhd_format: VHDX
+    vhd_type: Dynamic
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_disk
+  retries: 3
+  delay: 45
+  until: create_disk is not failed
+
+- name: Assert disk created with correct return values
+  assert:
+    that:
+      - create_disk.changed == true
+      - create_disk.vm_disk.id is defined
+      - create_disk.vm_disk.id | length > 0
+      - create_disk.vm_disk.bus_type == 'SCSI'
+      - create_disk.vm_disk.bus == 0
+      - create_disk.vm_disk.lun == 1
+      - create_disk.vm_disk.size_gb == 5
+      - create_disk.vm_disk.vhd_format == 'VHDX'
+      - create_disk.vm_disk.enabled == true
+
+- name: Verify disk via info module
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert disk visible in SCVMM
+  assert:
+    that:
+      - verify_create.disk_drives | length == (initial_disk_count | int) + 1
+      - verify_create.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | list | length == 1
+
+# ============================================================
+# Idempotency - create same disk again (no change)
+# ============================================================
+
+- name: Create same disk again (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_idem
+
+- name: Assert idempotent (no change)
+  assert:
+    that:
+      - create_idem.changed == false
+      - create_idem.vm_disk.bus == 0
+      - create_idem.vm_disk.lun == 1
+
+# ============================================================
+# Check mode - present when already exists (no-op)
+# ============================================================
+
+- name: Check mode - present when already exists
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_noop
+
+- name: Assert check mode no-op
+  assert:
+    that:
+      - check_noop.changed == false
+
+# ============================================================
+# Expand disk (Expand-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Check mode - Expand disk to 10 GB
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    size_gb: 10
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_expand
+
+- name: Assert check mode expand reports changed
+  assert:
+    that:
+      - check_expand.changed == true
+
+- name: Verify check mode expand did not actually change size
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_expand
+
+- name: Assert size is still 5 GB after check mode expand
+  assert:
+    that:
+      - (verify_check_expand.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | first).size_gb == 5
+
+- name: Expand disk to 10 GB
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    size_gb: 10
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: expand_disk
+  retries: 3
+  delay: 45
+  until: expand_disk is not failed
+
+- name: Assert disk expanded
+  assert:
+    that:
+      - expand_disk.changed == true
+      - expand_disk.vm_disk.size_gb == 10
+
+- name: Expand same size (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    size_gb: 10
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: expand_idem
+
+- name: Assert expand idempotent
+  assert:
+    that:
+      - expand_idem.changed == false
+
+- name: Verify expanded size via info module
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_expand
+
+- name: Assert info module shows expanded size
+  assert:
+    that:
+      - (verify_expand.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | first).size_gb == 10
+
+# ============================================================
+# Set disk properties (Set-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Set iops_maximum on disk
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    iops_maximum: 1000
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_iops
+
+- name: Assert iops_maximum was set
+  assert:
+    that:
+      - set_iops.changed == true
+      - set_iops.vm_disk.iops_maximum == 1000
+
+- name: Set same iops_maximum again (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    iops_maximum: 1000
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_iops_idem
+
+- name: Assert set iops_maximum idempotent
+  assert:
+    that:
+      - set_iops_idem.changed == false
+      - set_iops_idem.vm_disk.iops_maximum == 1000
+
+- name: Verify iops_maximum via info module
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_iops
+
+- name: Assert info shows updated iops_maximum
+  assert:
+    that:
+      - (verify_iops.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | first).iops_maximum == 1000
+
+# ============================================================
+# Set volume_type (Set-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Set volume_type to Boot
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    volume_type: Boot
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_volume_type
+
+- name: Assert volume_type was set
+  assert:
+    that:
+      - set_volume_type.changed == true
+      - set_volume_type.vm_disk.volume_type == 'Boot'
+
+- name: Set same volume_type again (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    volume_type: Boot
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_volume_type_idem
+
+- name: Assert volume_type idempotent
+  assert:
+    that:
+      - set_volume_type_idem.changed == false
+      - set_volume_type_idem.vm_disk.volume_type == 'Boot'
+
+- name: Verify volume_type via info module
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_volume_type
+
+- name: Assert info shows Boot volume_type
+  assert:
+    that:
+      - (verify_volume_type.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | first).volume_type == 'Boot'
+
+- name: Reset volume_type to None
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    volume_type: None
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: reset_volume_type
+
+- name: Assert volume_type reset
+  assert:
+    that:
+      - reset_volume_type.changed == true
+      - reset_volume_type.vm_disk.volume_type == 'None'
+
+# ============================================================
+# Shrink disk (should fail)
+# ============================================================
+
+- name: Attempt to shrink disk (should fail)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    size_gb: 3
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: shrink_fail
+  ignore_errors: true
+
+- name: Assert shrink fails
+  assert:
+    that:
+      - shrink_fail is failed
+      - "'Cannot shrink' in shrink_fail.msg"
+
+# ============================================================
+# Compress disk (Compress-SCVirtualDiskDrive)
+# Compress only works on dynamic/differencing disks, must run
+# before convert to fixed.
+# ============================================================
+
+- name: Ensure test VM is stopped before compress
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Check mode - Compress disk
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    compress: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_compress
+
+- name: Assert check mode compress reports changed
+  assert:
+    that:
+      - check_compress.changed == true
+
+- name: Compress disk
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    compress: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: compress_disk
+  retries: 3
+  delay: 45
+  until: compress_disk is not failed
+
+- name: Assert compress reports changed
+  assert:
+    that:
+      - compress_disk.changed == true
+      - compress_disk.vm_disk.bus == 0
+      - compress_disk.vm_disk.lun == 1
+
+# ============================================================
+# Validate disk (Test-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Validate disk
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    validate: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: validate_disk
+  retries: 3
+  delay: 45
+  until: validate_disk is not failed
+
+- name: Assert validation passed
+  assert:
+    that:
+      - validate_disk.vm_disk.bus == 0
+      - validate_disk.vm_disk.lun == 1
+      - validate_disk.validation == "passed"
+
+# ============================================================
+# Convert disk type (Convert-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Ensure test VM is stopped before convert
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Convert disk from Dynamic to Fixed
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    convert_to_type: Fixed
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: convert_disk
+  retries: 3
+  delay: 45
+  until: convert_disk is not failed
+
+- name: Assert disk converted to Fixed
+  assert:
+    that:
+      - convert_disk.changed == true
+
+- name: Verify conversion via info module
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_convert
+
+- name: Assert info shows Fixed type
+  assert:
+    that:
+      - (verify_convert.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | first).vhd_type == 'FixedSize'
+
+- name: Convert disk to Fixed again (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    convert_to_type: Fixed
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: convert_idem
+
+- name: Assert convert idempotent
+  assert:
+    that:
+      - convert_idem.changed == false
+
+# ============================================================
+# Convert disk format (Convert-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Ensure test VM is stopped before format convert
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Convert disk from VHDX to VHD
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    convert_to_format: VHD
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: convert_format
+  retries: 3
+  delay: 45
+  until: convert_format is not failed
+
+- name: Assert disk format converted
+  assert:
+    that:
+      - convert_format.changed == true
+
+- name: Verify format conversion via info module
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_format
+
+- name: Assert info shows VHD format
+  assert:
+    that:
+      - (verify_format.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | first).vhd_format == 'VHD'
+
+- name: Convert to VHD again (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    convert_to_format: VHD
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: convert_format_idem
+
+- name: Assert format convert idempotent
+  assert:
+    that:
+      - convert_format_idem.changed == false
+
+# ============================================================
+# Check mode - remove disk (Remove-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Check mode - Remove disk
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_remove
+
+- name: Assert check mode remove reports changed
+  assert:
+    that:
+      - check_remove.changed == true
+
+- name: Verify check mode did not remove disk
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_remove
+
+- name: Assert disk still exists after check mode
+  assert:
+    that:
+      - post_check_remove.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | list | length == 1
+
+# ============================================================
+# Remove disk (Remove-SCVirtualDiskDrive)
+# ============================================================
+
+- name: Remove disk at SCSI 0:1
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: remove_disk
+  retries: 3
+  delay: 45
+  until: remove_disk is not failed
+
+- name: Assert disk removed
+  assert:
+    that:
+      - remove_disk.changed == true
+
+- name: Verify disk removed via info module
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_remove_verify
+
+- name: Assert disk at SCSI 0:1 no longer exists
+  assert:
+    that:
+      - post_remove_verify.disk_drives | selectattr('bus', 'equalto', 0) | selectattr('lun', 'equalto', 1) | list | length == 0
+
+# ============================================================
+# Remove disk idempotency
+# ============================================================
+
+- name: Remove disk again (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: remove_idem
+
+- name: Assert remove is idempotent
+  assert:
+    that:
+      - remove_idem.changed == false
+
+- name: Check mode - remove when already absent (no-op)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 1
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_remove_noop
+
+- name: Assert check mode absent no-op
+  assert:
+    that:
+      - check_remove_noop.changed == false
+
+# ============================================================
+# Remove with delete_vhd (deletes VHD file from disk)
+# Use lun 2 to avoid VHD file collision with the orphaned
+# VHD left behind by the previous remove at lun 1.
+# ============================================================
+
+- name: Ensure test VM is stopped before delete_vhd test
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Create disk to test delete_vhd
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 2
+    size_gb: 5
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_for_delete
+  retries: 3
+  delay: 45
+  until: create_for_delete is not failed
+
+- name: Remove disk with delete_vhd
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 2
+    state: absent
+    delete_vhd: true
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: remove_with_delete
+  retries: 3
+  delay: 45
+  until: remove_with_delete is not failed
+
+- name: Assert remove with delete_vhd
+  assert:
+    that:
+      - remove_with_delete.changed == true
+
+# ============================================================
+# Create disk on non-default bus/lun
+# ============================================================
+
+- name: Create disk at SCSI 0:2
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 2
+    size_gb: 5
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_alt
+  retries: 3
+  delay: 45
+  until: create_alt is not failed
+
+- name: Assert non-default disk created
+  assert:
+    that:
+      - create_alt.changed == true
+      - create_alt.vm_disk.bus == 0
+      - create_alt.vm_disk.lun == 2
+      - create_alt.vm_disk.size_gb == 5
+
+- name: Remove non-default disk
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 2
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: remove_alt
+  retries: 3
+  delay: 45
+  until: remove_alt is not failed
+
+- name: Assert non-default disk removed
+  assert:
+    that:
+      - remove_alt.changed == true
+
+# ============================================================
+# Create disk with vhd_name (attach existing VHD)
+# ============================================================
+
+- name: Ensure test VM is stopped before attach test
+  microsoft.scvmm.scvmm_vm_state:
+    name: "{{ test_vm }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+
+- name: Create a VHD to use for attach test
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 3
+    size_gb: 5
+    file_name: "attach_test_vhd"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_for_attach
+  retries: 3
+  delay: 45
+  until: create_for_attach is not failed
+
+- name: Save VHD name for attach
+  ansible.builtin.set_fact:
+    attach_vhd_name: "{{ create_for_attach.vm_disk.vhd_name }}"
+
+- name: Detach VHD (remove without delete)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 3
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: detach_vhd
+  retries: 3
+  delay: 45
+  until: detach_vhd is not failed
+
+- name: Attach existing VHD by name
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 3
+    vhd_name: "{{ attach_vhd_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: attach_disk
+  retries: 3
+  delay: 45
+  until: attach_disk is not failed
+
+- name: Assert VHD attached
+  assert:
+    that:
+      - attach_disk.changed == true
+      - attach_disk.vm_disk.vhd_name == attach_vhd_name
+      - attach_disk.vm_disk.bus == 0
+      - attach_disk.vm_disk.lun == 3
+
+- name: Attach same VHD again (idempotency)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 3
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: attach_idem
+
+- name: Assert attach idempotent
+  assert:
+    that:
+      - attach_idem.changed == false
+
+- name: Remove attached VHD with delete
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 3
+    state: absent
+    delete_vhd: true
+    vmm_server: "{{ scvmm_server }}"
+  vars:
+    ansible_winrm_read_timeout_sec: 600
+  register: remove_attached
+  retries: 3
+  delay: 45
+  until: remove_attached is not failed
+
+- name: Assert attached VHD removed
+  assert:
+    that:
+      - remove_attached.changed == true
+
+# ============================================================
+# Error handling - non-existent VM
+# ============================================================
+
+- name: Add disk to non-existent VM
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    bus_type: scsi
+    bus: 0
+    lun: 0
+    size_gb: 5
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disk_error
+  ignore_errors: true
+
+- name: Assert missing VM fails
+  assert:
+    that:
+      - disk_error is failed
+      - "'not found' in disk_error.msg"
+
+# ============================================================
+# Error handling - missing vhd_name and size_gb
+# ============================================================
+
+- name: Create disk without vhd_name or size_gb (should fail)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "{{ test_vm }}"
+    bus_type: scsi
+    bus: 0
+    lun: 3
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_source_error
+  ignore_errors: true
+
+- name: Assert missing source fails
+  assert:
+    that:
+      - no_source_error is failed
+      - "'vhd_name' in no_source_error.msg or 'size_gb' in no_source_error.msg"
+
+# ============================================================
+# Info module - non-existent VM returns empty list
+# ============================================================
+
+- name: Info on non-existent VM
+  microsoft.scvmm.scvmm_vm_disk_info:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_novm
+
+- name: Assert info returns empty list for non-existent VM
+  assert:
+    that:
+      - info_novm.disk_drives is defined
+      - info_novm.disk_drives | length == 0
+
+# ============================================================
+# Remove absent from non-existent VM (no error)
+# ============================================================
+
+- name: Remove disk from non-existent VM (state=absent, no error)
+  microsoft.scvmm.scvmm_vm_disk:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    bus_type: scsi
+    bus: 0
+    lun: 0
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_novm
+
+- name: Assert absent on non-existent VM is no-op
+  assert:
+    that:
+      - absent_novm.changed == false
