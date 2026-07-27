@@ -25,6 +25,9 @@ $propertyMap = @(
     @{ Param = "vm_network"; Property = "VMNetwork"; Type = "nested_name" }
     @{ Param = "mac_address"; Property = "MACAddress"; Type = "string" }
     @{ Param = "mac_address_type"; Property = "MACAddressType"; Type = "enum" }
+    @{ Param = "vlan_enabled"; Property = "VlanEnabled"; Type = "bool" }
+    @{ Param = "vlan_id"; Property = "VLanID"; Type = "int" }
+    @{ Param = "port_classification"; Property = "PortClassification"; Type = "nested_name" }
 )
 
 $vm = Get-SCVMMObject -Module $module -VMMConnection $vmmConnection `

@@ -1,0 +1,143 @@
+---
+# --- Get initial adapter state ---
+- name: Get adapter state via info module
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: initial_info
+
+- name: Find the test adapter
+  ansible.builtin.set_fact:
+    test_adapter: "{{ initial_info.network_adapters | selectattr('vm_network', 'equalto', test_vmnet_name) | first }}"
+
+- name: Assert adapter exists and info includes new fields
+  ansible.builtin.assert:
+    that:
+      - test_adapter.id is defined
+      - test_adapter.vm_network == test_vmnet_name
+      - test_adapter.mac_address_type == "Dynamic"
+      - test_adapter.vlan_enabled is defined
+      - test_adapter.vlan_id is defined
+      - test_adapter.port_classification is defined
+
+# --- Idempotency: no change needed ---
+- name: Set MAC address type to Dynamic (already Dynamic - no change)
+  microsoft.scvmm.scvmm_vm_nic:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Dynamic
+    vmm_server: "{{ scvmm_server }}"
+  register: set_dynamic_noop
+
+- name: Assert no change when already Dynamic
+  ansible.builtin.assert:
+    that:
+      - set_dynamic_noop.changed == false
+      - set_dynamic_noop.vm_nic.mac_address_type == "Dynamic"
+      - set_dynamic_noop.vm_nic.vm_network == test_vmnet_name
+      - set_dynamic_noop.vm_nic.vm_name == test_vm
+      - set_dynamic_noop.vm_nic.id is defined
+      - set_dynamic_noop.vm_nic.vlan_enabled is defined
+      - set_dynamic_noop.vm_nic.vlan_id is defined
+      - set_dynamic_noop.vm_nic.port_classification is defined
+      - set_dynamic_noop.vm_nic.ipv4_addresses is defined
+      - set_dynamic_noop.vm_nic.is_synthetic == true
+
+# --- Check mode: would change MAC type ---
+- name: Check mode - set MAC to Static
+  microsoft.scvmm.scvmm_vm_nic:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Static
+    mac_address: "00:1A:2B:3C:4D:5E"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_change
+  diff: true
+
+- name: Assert check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - check_mode_change.changed == true
+      - check_mode_change.diff.before.mac_address_type == "Dynamic"
+      - check_mode_change.diff.after.mac_address_type == "Static"
+
+- name: Verify check mode did not change adapter
+  microsoft.scvmm.scvmm_network_adapter_info:
+    vm_name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_info
+
+- name: Find adapter after check mode
+  ansible.builtin.set_fact:
+    check_adapter: "{{ after_check_info.network_adapters | selectattr('vm_network', 'equalto', test_vmnet_name) | first }}"
+
+- name: Assert adapter unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - check_adapter.mac_address_type == "Dynamic"
+
+# --- Check mode: no change scenario ---
+- name: Check mode - no change (same Dynamic MAC)
+  microsoft.scvmm.scvmm_vm_nic:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Dynamic
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_noop
+
+- name: Assert check mode reports no change
+  ansible.builtin.assert:
+    that:
+      - check_mode_noop.changed == false
+
+# --- Check mode: would enable VLAN ---
+- name: Check mode - enable VLAN
+  microsoft.scvmm.scvmm_vm_nic:
+    vm_name: "{{ test_vm }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vlan_enabled: true
+    vlan_id: 100
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_vlan
+  diff: true
+
+- name: Assert check mode reports VLAN change
+  ansible.builtin.assert:
+    that:
+      - check_mode_vlan.changed == true
+      - check_mode_vlan.diff.before.vlan_enabled == false
+      - check_mode_vlan.diff.after.vlan_enabled == true
+      - check_mode_vlan.diff.after.vlan_id == 100
+
+# --- Error: non-existent VM ---
+- name: Configure NIC on non-existent VM
+  microsoft.scvmm.scvmm_vm_nic:
+    vm_name: "NonExistentVM_{{ 99999 | random }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Dynamic
+    vmm_server: "{{ scvmm_server }}"
+  register: error_no_vm
+  ignore_errors: true
+
+- name: Assert error for non-existent VM
+  ansible.builtin.assert:
+    that:
+      - error_no_vm.failed == true
+
+# --- Error: non-existent VM network on adapter ---
+- name: Configure NIC with wrong VM network
+  microsoft.scvmm.scvmm_vm_nic:
+    vm_name: "{{ test_vm }}"
+    vm_network: "NonExistentNetwork_{{ 99999 | random }}"
+    mac_address_type: Dynamic
+    vmm_server: "{{ scvmm_server }}"
+  register: error_no_network
+  ignore_errors: true
+
+- name: Assert error for wrong VM network
+  ansible.builtin.assert:
+    that:
+      - error_no_network.failed == true
