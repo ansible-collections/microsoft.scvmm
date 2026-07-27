@@ -12,23 +12,31 @@
     test_logical_network_definition: "{{ test_ln_name }}_LND"
 
 - block:
-    - name: Setup - Create logical network via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
-        $ln = New-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -EnableNetworkVirtualization $true -UseGRE $true -ErrorAction Stop
-        $hg = Get-SCVMHostGroup -VMMServer $vmmServer -Name "All Hosts"
-        $subnetVlan = New-SCSubnetVLan -Subnet "10.99.0.0/24" -VLanID 0
-        New-SCLogicalNetworkDefinition -Name "{{ test_ln_name }}_LND" -LogicalNetwork $ln -VMHostGroup $hg -SubnetVLan $subnetVlan -ErrorAction Stop | Out-Null
-        "created"
-      register: setup_ln
+    - name: Setup - Create logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
 
-    - name: Setup - Create VM network via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
-        $ln = Get-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}"
-        New-SCVMNetwork -VMMServer $vmmServer -Name "{{ test_vmnet_name }}" -LogicalNetwork $ln -IsolationType "WindowsNetworkVirtualization" -ErrorAction Stop | Out-Null
-        "created"
-      register: setup_vmnet
+    - name: Setup - Create logical network definition
+      microsoft.scvmm.scvmm_logical_network_definition:
+        name: "{{ test_logical_network_definition }}"
+        logical_network: "{{ test_ln_name }}"
+        host_groups:
+          - All Hosts
+        subnet_vlans:
+          - subnet: "10.99.0.0/24"
+            vlan_id: 0
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Setup - Create VM network
+      microsoft.scvmm.scvmm_vm_network:
+        name: "{{ test_vmnet_name }}"
+        logical_network: "{{ test_ln_name }}"
+        isolation_type: WindowsNetworkVirtualization
+        state: present
+        vmm_server: "{{ scvmm_server }}"
 
     - name: Run tests
       ansible.builtin.include_tasks: tests.yml
@@ -40,24 +48,24 @@
         vmm_server: "{{ scvmm_server }}"
       ignore_errors: true
 
-    - name: Teardown - Remove VM network via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
-        $vmNet = Get-SCVMNetwork -VMMServer $vmmServer -Name "{{ test_vmnet_name }}"
-        if ($vmNet) {
-          Get-SCVMSubnet -VMNetwork $vmNet | ForEach-Object { Remove-SCVMSubnet -VMSubnet $_ -Force | Out-Null }
-          Remove-SCVMNetwork -VMNetwork $vmNet -Force | Out-Null
-        }
-        "done"
+    - name: Teardown - Remove VM network
+      microsoft.scvmm.scvmm_vm_network:
+        name: "{{ test_vmnet_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
       ignore_errors: true
 
-    - name: Teardown - Remove logical network via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
-        $ln = Get-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}"
-        if ($ln) {
-          Get-SCLogicalNetworkDefinition -LogicalNetwork $ln | ForEach-Object { Remove-SCLogicalNetworkDefinition -LogicalNetworkDefinition $_ -Force | Out-Null }
-          Remove-SCLogicalNetwork -LogicalNetwork $ln -Force | Out-Null
-        }
-        "done"
+    - name: Teardown - Remove logical network definition
+      microsoft.scvmm.scvmm_logical_network_definition:
+        name: "{{ test_logical_network_definition }}"
+        logical_network: "{{ test_ln_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
       ignore_errors: true

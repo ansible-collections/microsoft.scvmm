@@ -7,17 +7,11 @@
     test_vlan_id: "{{ range(100, 999) | random }}"
 
 - block:
-    - name: Setup - Create logical network via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
-        New-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -ErrorAction Stop | Out-Null
-        "created"
-      register: ln_setup
-
-    - name: Assert logical network created
-      ansible.builtin.assert:
-        that:
-          - "'created' in ln_setup.stdout"
+    - name: Setup - Create logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
 
     - name: Run tests
       ansible.builtin.include_tasks: tests.yml
@@ -30,12 +24,9 @@
         vmm_server: "{{ scvmm_server }}"
       ignore_errors: true
 
-    - name: Teardown - Remove logical network via PowerShell
-      ansible.windows.win_shell: |
-        $vmmServer = Get-SCVMMServer "{{ scvmm_server }}"
-        $ln = Get-SCLogicalNetwork -VMMServer $vmmServer -Name "{{ test_ln_name }}" -ErrorAction SilentlyContinue
-        if ($ln) {
-          Get-SCLogicalNetworkDefinition -LogicalNetwork $ln | Remove-SCLogicalNetworkDefinition -Force -ErrorAction SilentlyContinue | Out-Null
-          Remove-SCLogicalNetwork -LogicalNetwork $ln -Force -ErrorAction SilentlyContinue | Out-Null
-        }
+    - name: Teardown - Remove logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
       ignore_errors: true
