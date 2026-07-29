@@ -1,0 +1,357 @@
+---
+# ============================================================
+# Info module - query all application profiles
+# ============================================================
+
+- name: Info - Query all application profiles
+  microsoft.scvmm.scvmm_application_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert info returns a list
+  assert:
+    that:
+      - all_profiles.application_profiles is defined
+      - all_profiles.application_profiles | type_debug == 'list'
+
+# ============================================================
+# Info module - query non-existent profile returns empty list
+# ============================================================
+
+- name: Info - Query non-existent profile
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "NonExistentProfile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_noexist
+
+- name: Assert non-existent profile returns empty list
+  assert:
+    that:
+      - info_noexist.application_profiles | length == 0
+
+# ============================================================
+# Check mode - create application profile
+# ============================================================
+
+- name: Check mode - Create application profile
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    description: Ansible test application profile
+    tag: ansible-test
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_create.changed == true
+
+- name: Verify check mode did not create profile
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_create
+
+- name: Assert profile was not actually created
+  assert:
+    that:
+      - post_check_create.application_profiles | length == 0
+
+# ============================================================
+# Create application profile
+# ============================================================
+
+- name: Create application profile
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    description: Ansible test application profile
+    tag: ansible-test
+    compatibility_type: General
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_profile
+
+- name: Assert profile created
+  assert:
+    that:
+      - create_profile.changed == true
+      - create_profile.application_profile.id is defined
+      - create_profile.application_profile.name == test_app_profile
+      - create_profile.application_profile.description == 'Ansible test application profile'
+      - create_profile.application_profile.tag == 'ansible-test'
+      - create_profile.application_profile.compatibility_type == 'General'
+
+- name: Verify profile via info module
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module shows created profile
+  assert:
+    that:
+      - verify_create.application_profiles | length == 1
+      - verify_create.application_profiles[0].name == test_app_profile
+      - verify_create.application_profiles[0].tag == 'ansible-test'
+      - verify_create.application_profiles[0].id is defined
+
+# ============================================================
+# Idempotency - create same profile again
+# ============================================================
+
+- name: Create same profile again (idempotency)
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    description: Ansible test application profile
+    tag: ansible-test
+    compatibility_type: General
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_idem
+
+- name: Assert idempotent (no change)
+  assert:
+    that:
+      - create_idem.changed == false
+
+# ============================================================
+# Check mode - update application profile
+# ============================================================
+
+- name: Check mode - Update tag
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    tag: updated-tag
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_update
+
+- name: Assert check mode update reports changed
+  assert:
+    that:
+      - check_update.changed == true
+
+- name: Verify check mode did not update
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_update
+
+- name: Assert tag unchanged after check mode
+  assert:
+    that:
+      - post_check_update.application_profiles[0].tag == 'ansible-test'
+
+# ============================================================
+# Update application profile
+# ============================================================
+
+- name: Update tag
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    tag: updated-tag
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_profile
+
+- name: Assert profile updated
+  assert:
+    that:
+      - update_profile.changed == true
+      - update_profile.application_profile.tag == 'updated-tag'
+
+- name: Update same values (idempotency)
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    tag: updated-tag
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_idem
+
+- name: Assert update idempotent
+  assert:
+    that:
+      - update_idem.changed == false
+
+- name: Verify update via info module
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info shows updated values
+  assert:
+    that:
+      - verify_update.application_profiles[0].tag == 'updated-tag'
+
+# ============================================================
+# Update description
+# ============================================================
+
+- name: Update description
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    description: Updated description
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_desc
+
+- name: Assert description updated
+  assert:
+    that:
+      - update_desc.changed == true
+      - update_desc.application_profile.description == 'Updated description'
+
+# ============================================================
+# Update owner
+# ============================================================
+
+- name: Update owner
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    owner: "SCVMM\\Administrator"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_owner
+
+- name: Assert owner update is idempotent (already the default owner)
+  assert:
+    that:
+      - update_owner.changed == false
+      - update_owner.application_profile.owner == 'SCVMM\Administrator'
+
+# ============================================================
+# Update compatibility type
+# ============================================================
+
+- name: Update compatibility type
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    compatibility_type: SQLApplicationHost
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_compat
+
+- name: Assert compatibility type updated
+  assert:
+    that:
+      - update_compat.changed == true
+      - update_compat.application_profile.compatibility_type == 'SQLApplicationHost'
+
+- name: Update compatibility type idempotency
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    compatibility_type: SQLApplicationHost
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_compat_idem
+
+- name: Assert compatibility type update idempotent
+  assert:
+    that:
+      - update_compat_idem.changed == false
+
+# ============================================================
+# Verify all params via info module
+# ============================================================
+
+- name: Verify all params via info module
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all
+
+- name: Assert info shows all values
+  assert:
+    that:
+      - verify_all.application_profiles[0].compatibility_type == 'SQLApplicationHost'
+      - verify_all.application_profiles[0].description == 'Updated description'
+      - verify_all.application_profiles[0].tag == 'updated-tag'
+      - verify_all.application_profiles[0].creation_time is defined
+
+# ============================================================
+# Check mode - remove application profile
+# ============================================================
+
+- name: Check mode - Remove application profile
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove
+
+- name: Assert check mode remove reports changed
+  assert:
+    that:
+      - check_remove.changed == true
+
+- name: Verify check mode did not remove profile
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_remove
+
+- name: Assert profile still exists after check mode
+  assert:
+    that:
+      - post_check_remove.application_profiles | length == 1
+
+# ============================================================
+# Remove application profile
+# ============================================================
+
+- name: Remove application profile
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_profile
+
+- name: Assert profile removed
+  assert:
+    that:
+      - remove_profile.changed == true
+
+- name: Verify profile removed via info module
+  microsoft.scvmm.scvmm_application_profile_info:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_remove
+
+- name: Assert profile no longer exists
+  assert:
+    that:
+      - post_remove.application_profiles | length == 0
+
+# ============================================================
+# Remove idempotency
+# ============================================================
+
+- name: Remove again (idempotency)
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_idem
+
+- name: Assert remove idempotent
+  assert:
+    that:
+      - remove_idem.changed == false
+
+- name: Check mode - remove when already absent
+  microsoft.scvmm.scvmm_application_profile:
+    name: "{{ test_app_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove_noop
+
+- name: Assert check mode absent no-op
+  assert:
+    that:
+      - check_remove_noop.changed == false
