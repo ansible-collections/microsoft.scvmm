@@ -1,0 +1,443 @@
+---
+# ============================================================
+# Info module - query all capability profiles
+# ============================================================
+
+- name: Info - Query all capability profiles
+  microsoft.scvmm.scvmm_capability_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert info returns a list
+  assert:
+    that:
+      - all_profiles.capability_profiles is defined
+      - all_profiles.capability_profiles | type_debug == 'list'
+
+# ============================================================
+# Info module - query non-existent profile returns empty list
+# ============================================================
+
+- name: Info - Query non-existent profile
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "NonExistentProfile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_noexist
+
+- name: Assert non-existent profile returns empty list
+  assert:
+    that:
+      - info_noexist.capability_profiles | length == 0
+
+# ============================================================
+# Check mode - create capability profile
+# ============================================================
+
+- name: Check mode - Create capability profile
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    fabric_capability_type: HyperV
+    description: Ansible test capability profile
+    cpu_count_initial: 2
+    cpu_count_minimum: 1
+    cpu_count_maximum: 8
+    memory_mb_initial: 2048
+    memory_mb_minimum: 512
+    memory_mb_maximum: 16384
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_create.changed == true
+
+- name: Verify check mode did not create profile
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_create
+
+- name: Assert profile was not actually created
+  assert:
+    that:
+      - post_check_create.capability_profiles | length == 0
+
+# ============================================================
+# Create capability profile
+# ============================================================
+
+- name: Create capability profile
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    fabric_capability_type: HyperV
+    description: Ansible test capability profile
+    cpu_count_initial: 2
+    cpu_count_minimum: 1
+    cpu_count_maximum: 8
+    memory_mb_initial: 2048
+    memory_mb_minimum: 512
+    memory_mb_maximum: 16384
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_profile
+
+- name: Assert profile created
+  assert:
+    that:
+      - create_profile.changed == true
+      - create_profile.capability_profile.id is defined
+      - create_profile.capability_profile.name == test_cap_profile
+      - create_profile.capability_profile.fabric_capability_type == 'HyperV'
+      - create_profile.capability_profile.cpu_count_initial == 2
+      - create_profile.capability_profile.cpu_count_minimum == 1
+      - create_profile.capability_profile.cpu_count_maximum == 8
+      - create_profile.capability_profile.memory_mb_initial == 2048
+      - create_profile.capability_profile.memory_mb_minimum == 512
+      - create_profile.capability_profile.memory_mb_maximum == 16384
+      - create_profile.capability_profile.description == 'Ansible test capability profile'
+
+- name: Verify profile via info module
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module shows created profile
+  assert:
+    that:
+      - verify_create.capability_profiles | length == 1
+      - verify_create.capability_profiles[0].name == test_cap_profile
+      - verify_create.capability_profiles[0].cpu_count_initial == 2
+      - verify_create.capability_profiles[0].id is defined
+
+# ============================================================
+# Idempotency - create same profile again
+# ============================================================
+
+- name: Create same profile again (idempotency)
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    fabric_capability_type: HyperV
+    description: Ansible test capability profile
+    cpu_count_initial: 2
+    cpu_count_minimum: 1
+    cpu_count_maximum: 8
+    memory_mb_initial: 2048
+    memory_mb_minimum: 512
+    memory_mb_maximum: 16384
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_idem
+
+- name: Assert idempotent (no change)
+  assert:
+    that:
+      - create_idem.changed == false
+
+# ============================================================
+# Check mode - update capability profile
+# ============================================================
+
+- name: Check mode - Update CPU maximum
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    cpu_count_maximum: 16
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_update
+
+- name: Assert check mode update reports changed
+  assert:
+    that:
+      - check_update.changed == true
+
+- name: Verify check mode did not update
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_update
+
+- name: Assert CPU maximum unchanged after check mode
+  assert:
+    that:
+      - post_check_update.capability_profiles[0].cpu_count_maximum == 8
+
+# ============================================================
+# Update capability profile
+# ============================================================
+
+- name: Update CPU maximum and memory maximum
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    cpu_count_maximum: 16
+    memory_mb_maximum: 32768
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_profile
+
+- name: Assert profile updated
+  assert:
+    that:
+      - update_profile.changed == true
+      - update_profile.capability_profile.cpu_count_maximum == 16
+      - update_profile.capability_profile.memory_mb_maximum == 32768
+
+- name: Update same values (idempotency)
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    cpu_count_maximum: 16
+    memory_mb_maximum: 32768
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_idem
+
+- name: Assert update idempotent
+  assert:
+    that:
+      - update_idem.changed == false
+
+- name: Verify update via info module
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info shows updated values
+  assert:
+    that:
+      - verify_update.capability_profiles[0].cpu_count_maximum == 16
+      - verify_update.capability_profiles[0].memory_mb_maximum == 32768
+
+# ============================================================
+# Update description
+# ============================================================
+
+- name: Update description
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    description: Updated description
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_desc
+
+- name: Assert description updated
+  assert:
+    that:
+      - update_desc.changed == true
+      - update_desc.capability_profile.description == 'Updated description'
+
+# ============================================================
+# Update dynamic memory settings
+# ============================================================
+
+- name: Update dynamic memory settings
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    dynamic_memory_value: true
+    dynamic_memory_value_can_change: true
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_dynmem
+
+- name: Assert dynamic memory updated
+  assert:
+    that:
+      - update_dynmem.changed == true
+      - update_dynmem.capability_profile.dynamic_memory_value == true
+      - update_dynmem.capability_profile.dynamic_memory_value_can_change == true
+
+- name: Update dynamic memory idempotency
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    dynamic_memory_value: true
+    dynamic_memory_value_can_change: true
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_dynmem_idem
+
+- name: Assert dynamic memory update idempotent
+  assert:
+    that:
+      - update_dynmem_idem.changed == false
+
+# ============================================================
+# Update VHD, DVD, and network adapter counts
+# ============================================================
+
+- name: Update VHD and network adapter counts
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    virtual_hard_disk_count_initial: 1
+    virtual_hard_disk_count_minimum: 0
+    virtual_hard_disk_count_maximum: 4
+    virtual_dvd_drive_count_initial: 1
+    virtual_dvd_drive_count_minimum: 0
+    virtual_dvd_drive_count_maximum: 2
+    virtual_network_adapter_count_initial: 1
+    virtual_network_adapter_count_minimum: 0
+    virtual_network_adapter_count_maximum: 4
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_counts
+
+- name: Assert counts updated
+  assert:
+    that:
+      - update_counts.changed == true
+      - update_counts.capability_profile.virtual_hard_disk_count_initial == 1
+      - update_counts.capability_profile.virtual_hard_disk_count_maximum == 4
+      - update_counts.capability_profile.virtual_dvd_drive_count_initial == 1
+      - update_counts.capability_profile.virtual_dvd_drive_count_maximum == 2
+      - update_counts.capability_profile.virtual_network_adapter_count_initial == 1
+      - update_counts.capability_profile.virtual_network_adapter_count_maximum == 4
+
+- name: Update counts idempotency
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    virtual_hard_disk_count_initial: 1
+    virtual_hard_disk_count_minimum: 0
+    virtual_hard_disk_count_maximum: 4
+    virtual_dvd_drive_count_initial: 1
+    virtual_dvd_drive_count_minimum: 0
+    virtual_dvd_drive_count_maximum: 2
+    virtual_network_adapter_count_initial: 1
+    virtual_network_adapter_count_minimum: 0
+    virtual_network_adapter_count_maximum: 4
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_counts_idem
+
+- name: Assert counts update idempotent
+  assert:
+    that:
+      - update_counts_idem.changed == false
+
+# ============================================================
+# Update HA settings
+# ============================================================
+
+- name: Update HA settings
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    vm_highly_available_value: true
+    vm_highly_available_value_can_change: true
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_ha
+
+- name: Assert HA settings updated
+  assert:
+    that:
+      - update_ha.changed == true
+      - update_ha.capability_profile.vm_highly_available_value == true
+      - update_ha.capability_profile.vm_highly_available_value_can_change == true
+
+# ============================================================
+# Verify all params via info module
+# ============================================================
+
+- name: Verify all params via info module
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all
+
+- name: Assert info shows all values
+  assert:
+    that:
+      - verify_all.capability_profiles[0].dynamic_memory_value == true
+      - verify_all.capability_profiles[0].dynamic_memory_value_can_change == true
+      - verify_all.capability_profiles[0].virtual_hard_disk_count_maximum == 4
+      - verify_all.capability_profiles[0].virtual_dvd_drive_count_maximum == 2
+      - verify_all.capability_profiles[0].virtual_network_adapter_count_maximum == 4
+      - verify_all.capability_profiles[0].vm_highly_available_value == true
+      - verify_all.capability_profiles[0].vm_highly_available_value_can_change == true
+      - verify_all.capability_profiles[0].fabric_capability_type == 'HyperV'
+
+# ============================================================
+# Check mode - remove capability profile
+# ============================================================
+
+- name: Check mode - Remove capability profile
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove
+
+- name: Assert check mode remove reports changed
+  assert:
+    that:
+      - check_remove.changed == true
+
+- name: Verify check mode did not remove profile
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_remove
+
+- name: Assert profile still exists after check mode
+  assert:
+    that:
+      - post_check_remove.capability_profiles | length == 1
+
+# ============================================================
+# Remove capability profile
+# ============================================================
+
+- name: Remove capability profile
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_profile
+
+- name: Assert profile removed
+  assert:
+    that:
+      - remove_profile.changed == true
+
+- name: Verify profile removed via info module
+  microsoft.scvmm.scvmm_capability_profile_info:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_remove
+
+- name: Assert profile no longer exists
+  assert:
+    that:
+      - post_remove.capability_profiles | length == 0
+
+# ============================================================
+# Remove idempotency
+# ============================================================
+
+- name: Remove again (idempotency)
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_idem
+
+- name: Assert remove idempotent
+  assert:
+    that:
+      - remove_idem.changed == false
+
+- name: Check mode - remove when already absent
+  microsoft.scvmm.scvmm_capability_profile:
+    name: "{{ test_cap_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove_noop
+
+- name: Assert check mode absent no-op
+  assert:
+    that:
+      - check_remove_noop.changed == false
