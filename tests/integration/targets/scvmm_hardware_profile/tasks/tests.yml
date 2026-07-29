@@ -1,0 +1,471 @@
+---
+# ============================================================
+# Info module - query all hardware profiles
+# ============================================================
+
+- name: Info - Query all hardware profiles
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert info returns a list
+  assert:
+    that:
+      - all_profiles.hardware_profiles is defined
+      - all_profiles.hardware_profiles | type_debug == 'list'
+
+# ============================================================
+# Info module - query non-existent profile returns empty list
+# ============================================================
+
+- name: Info - Query non-existent profile
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "NonExistentProfile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_noexist
+
+- name: Assert non-existent profile returns empty list
+  assert:
+    that:
+      - info_noexist.hardware_profiles | length == 0
+
+# ============================================================
+# Check mode - create hardware profile
+# ============================================================
+
+- name: Check mode - Create hardware profile
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    cpu_count: 2
+    memory_mb: 4096
+    description: Ansible test hardware profile
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_create.changed == true
+
+- name: Verify check mode did not create profile
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_create
+
+- name: Assert profile was not actually created
+  assert:
+    that:
+      - post_check_create.hardware_profiles | length == 0
+
+# ============================================================
+# Create hardware profile
+# ============================================================
+
+- name: Create hardware profile
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    cpu_count: 2
+    memory_mb: 4096
+    description: Ansible test hardware profile
+    generation: 2
+    checkpoint_type: Production
+    cpu_expected_utilization_percent: 30
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_profile
+
+- name: Assert profile created
+  assert:
+    that:
+      - create_profile.changed == true
+      - create_profile.hardware_profile.id is defined
+      - create_profile.hardware_profile.name == test_hw_profile
+      - create_profile.hardware_profile.cpu_count == 2
+      - create_profile.hardware_profile.memory_mb == 4096
+      - create_profile.hardware_profile.description == 'Ansible test hardware profile'
+      - create_profile.hardware_profile.generation == 2
+      - create_profile.hardware_profile.checkpoint_type == 'Production'
+      - create_profile.hardware_profile.cpu_expected_utilization_percent == 30
+
+- name: Verify profile via info module
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module shows created profile
+  assert:
+    that:
+      - verify_create.hardware_profiles | length == 1
+      - verify_create.hardware_profiles[0].name == test_hw_profile
+      - verify_create.hardware_profiles[0].cpu_count == 2
+      - verify_create.hardware_profiles[0].memory_mb == 4096
+      - verify_create.hardware_profiles[0].id is defined
+
+# ============================================================
+# Idempotency - create same profile again
+# ============================================================
+
+- name: Create same profile again (idempotency)
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    cpu_count: 2
+    memory_mb: 4096
+    description: Ansible test hardware profile
+    checkpoint_type: Production
+    cpu_expected_utilization_percent: 30
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_idem
+
+- name: Assert idempotent (no change)
+  assert:
+    that:
+      - create_idem.changed == false
+
+# ============================================================
+# Check mode - update hardware profile
+# ============================================================
+
+- name: Check mode - Update CPU count
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    cpu_count: 4
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_update
+
+- name: Assert check mode update reports changed
+  assert:
+    that:
+      - check_update.changed == true
+
+- name: Verify check mode did not update
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_update
+
+- name: Assert CPU count unchanged after check mode
+  assert:
+    that:
+      - post_check_update.hardware_profiles[0].cpu_count == 2
+
+# ============================================================
+# Update hardware profile
+# ============================================================
+
+- name: Update CPU count and memory
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    cpu_count: 4
+    memory_mb: 8192
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_profile
+
+- name: Assert profile updated
+  assert:
+    that:
+      - update_profile.changed == true
+      - update_profile.hardware_profile.cpu_count == 4
+      - update_profile.hardware_profile.memory_mb == 8192
+
+- name: Update same values (idempotency)
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    cpu_count: 4
+    memory_mb: 8192
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_idem
+
+- name: Assert update idempotent
+  assert:
+    that:
+      - update_idem.changed == false
+
+- name: Verify update via info module
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info shows updated values
+  assert:
+    that:
+      - verify_update.hardware_profiles[0].cpu_count == 4
+      - verify_update.hardware_profiles[0].memory_mb == 8192
+
+# ============================================================
+# Update description
+# ============================================================
+
+- name: Update description
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    description: Updated description
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_desc
+
+- name: Assert description updated
+  assert:
+    that:
+      - update_desc.changed == true
+      - update_desc.hardware_profile.description == 'Updated description'
+
+# ============================================================
+# Update additional parameters
+# ============================================================
+
+- name: Update checkpoint type and CPU params
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    checkpoint_type: Standard
+    cpu_expected_utilization_percent: 50
+    cpu_reserve: 10
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_additional
+
+- name: Assert additional params updated
+  assert:
+    that:
+      - update_additional.changed == true
+      - update_additional.hardware_profile.checkpoint_type == 'Standard'
+      - update_additional.hardware_profile.cpu_expected_utilization_percent == 50
+      - update_additional.hardware_profile.cpu_reserve == 10
+
+- name: Update additional params idempotency
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    checkpoint_type: Standard
+    cpu_expected_utilization_percent: 50
+    cpu_reserve: 10
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_additional_idem
+
+- name: Assert additional params update idempotent
+  assert:
+    that:
+      - update_additional_idem.changed == false
+
+# ============================================================
+# Update secure boot (Gen2 required)
+# ============================================================
+
+- name: Update secure boot enabled
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    secure_boot_enabled: false
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_sb
+
+- name: Assert secure boot updated
+  assert:
+    that:
+      - update_sb.changed == true
+      - update_sb.hardware_profile.secure_boot_enabled == false
+
+# ============================================================
+# Update dynamic memory
+# ============================================================
+
+- name: Enable dynamic memory
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    dynamic_memory: true
+    dynamic_memory_minimum_mb: 512
+    dynamic_memory_maximum_mb: 16384
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_dynmem
+
+- name: Assert dynamic memory enabled
+  assert:
+    that:
+      - update_dynmem.changed == true
+      - update_dynmem.hardware_profile.dynamic_memory == true
+      - update_dynmem.hardware_profile.dynamic_memory_minimum_mb == 512
+      - update_dynmem.hardware_profile.dynamic_memory_maximum_mb == 16384
+
+- name: Update owner
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    owner: "SCVMM\\Administrator"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_owner
+
+- name: Assert owner update
+  assert:
+    that:
+      - update_owner.hardware_profile.owner == 'SCVMM\Administrator'
+
+# ============================================================
+# Update CPU and network params
+# ============================================================
+
+- name: Update network utilization
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    network_utilization_mbps: 100
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_net
+
+- name: Assert network utilization updated
+  assert:
+    that:
+      - update_net.changed == true
+      - update_net.hardware_profile.network_utilization_mbps == 100
+
+- name: Update network utilization idempotency
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    network_utilization_mbps: 100
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_net_idem
+
+- name: Assert network utilization update idempotent
+  assert:
+    that:
+      - update_net_idem.changed == false
+
+# ============================================================
+# Info module - check mode
+# ============================================================
+
+- name: Info - check mode query
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: info_check_mode
+
+- name: Assert info check mode returns data
+  assert:
+    that:
+      - info_check_mode.changed == false
+      - info_check_mode.hardware_profiles | length == 1
+
+# ============================================================
+# Verify all params via info module
+# ============================================================
+
+- name: Verify all params via info module
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all_updates
+
+- name: Assert info shows all updated values
+  assert:
+    that:
+      - verify_all_updates.hardware_profiles[0].checkpoint_type == 'Standard'
+      - verify_all_updates.hardware_profiles[0].dynamic_memory == true
+      - verify_all_updates.hardware_profiles[0].dynamic_memory_minimum_mb == 512
+      - verify_all_updates.hardware_profiles[0].dynamic_memory_maximum_mb == 16384
+      - verify_all_updates.hardware_profiles[0].secure_boot_enabled == false
+      - verify_all_updates.hardware_profiles[0].generation == 2
+      - verify_all_updates.hardware_profiles[0].creation_time is defined
+      - verify_all_updates.hardware_profiles[0].owner == 'SCVMM\Administrator'
+      - verify_all_updates.hardware_profiles[0].highly_available is defined
+      - verify_all_updates.hardware_profiles[0].cpu_maximum_percent is defined
+      - verify_all_updates.hardware_profiles[0].cpu_relative_weight is defined
+      - verify_all_updates.hardware_profiles[0].network_utilization_mbps == 100
+      - verify_all_updates.hardware_profiles[0].disk_iops is defined
+      - verify_all_updates.hardware_profiles[0].cpu_reserve == 10
+      - verify_all_updates.hardware_profiles[0].cpu_expected_utilization_percent == 50
+
+# ============================================================
+# Check mode - remove hardware profile
+# ============================================================
+
+- name: Check mode - Remove hardware profile
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove
+
+- name: Assert check mode remove reports changed
+  assert:
+    that:
+      - check_remove.changed == true
+
+- name: Verify check mode did not remove profile
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_remove
+
+- name: Assert profile still exists after check mode
+  assert:
+    that:
+      - post_check_remove.hardware_profiles | length == 1
+
+# ============================================================
+# Remove hardware profile
+# ============================================================
+
+- name: Remove hardware profile
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_profile
+
+- name: Assert profile removed
+  assert:
+    that:
+      - remove_profile.changed == true
+
+- name: Verify profile removed via info module
+  microsoft.scvmm.scvmm_hardware_profile_info:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_remove
+
+- name: Assert profile no longer exists
+  assert:
+    that:
+      - post_remove.hardware_profiles | length == 0
+
+# ============================================================
+# Remove idempotency
+# ============================================================
+
+- name: Remove again (idempotency)
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_idem
+
+- name: Assert remove idempotent
+  assert:
+    that:
+      - remove_idem.changed == false
+
+- name: Check mode - remove when already absent
+  microsoft.scvmm.scvmm_hardware_profile:
+    name: "{{ test_hw_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove_noop
+
+- name: Assert check mode absent no-op
+  assert:
+    that:
+      - check_remove_noop.changed == false
