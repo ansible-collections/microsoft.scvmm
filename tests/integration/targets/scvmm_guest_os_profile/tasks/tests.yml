@@ -1,0 +1,433 @@
+---
+# ============================================================
+# Info module - query all guest OS profiles
+# ============================================================
+
+- name: Info - Query all guest OS profiles
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert info returns a list
+  assert:
+    that:
+      - all_profiles.guest_os_profiles is defined
+      - all_profiles.guest_os_profiles | type_debug == 'list'
+
+# ============================================================
+# Info module - query non-existent profile returns empty list
+# ============================================================
+
+- name: Info - Query non-existent profile
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "NonExistentProfile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_noexist
+
+- name: Assert non-existent profile returns empty list
+  assert:
+    that:
+      - info_noexist.guest_os_profiles | length == 0
+
+# ============================================================
+# Check mode - create guest OS profile
+# ============================================================
+
+- name: Check mode - Create guest OS profile
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    operating_system: "{{ test_os_name }}"
+    computer_name: TestPC
+    full_name: Test User
+    organization_name: TestOrg
+    description: Ansible test guest OS profile
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode reports changed
+  assert:
+    that:
+      - check_create.changed == true
+
+- name: Verify check mode did not create profile
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_create
+
+- name: Assert profile was not actually created
+  assert:
+    that:
+      - post_check_create.guest_os_profiles | length == 0
+
+# ============================================================
+# Create guest OS profile
+# ============================================================
+
+- name: Create guest OS profile
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    operating_system: "{{ test_os_name }}"
+    computer_name: TestPC
+    full_name: Test User
+    organization_name: TestOrg
+    time_zone: 35
+    description: Ansible test guest OS profile
+    workgroup: WORKGROUP
+    gui_run_once_commands:
+      - echo hello
+      - echo world
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_profile
+
+- name: Assert profile created
+  assert:
+    that:
+      - create_profile.changed == true
+      - create_profile.guest_os_profile.id is defined
+      - create_profile.guest_os_profile.name == test_gos_profile
+      - create_profile.guest_os_profile.operating_system == test_os_name
+      - create_profile.guest_os_profile.computer_name == 'TestPC'
+      - create_profile.guest_os_profile.full_name == 'Test User'
+      - create_profile.guest_os_profile.organization_name == 'TestOrg'
+      - create_profile.guest_os_profile.time_zone == 35
+      - create_profile.guest_os_profile.description == 'Ansible test guest OS profile'
+      - create_profile.guest_os_profile.workgroup == 'WORKGROUP'
+      - create_profile.guest_os_profile.gui_run_once_commands | length == 2
+      - create_profile.guest_os_profile.gui_run_once_commands[0] == 'echo hello'
+
+- name: Verify profile via info module
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module shows created profile
+  assert:
+    that:
+      - verify_create.guest_os_profiles | length == 1
+      - verify_create.guest_os_profiles[0].name == test_gos_profile
+      - verify_create.guest_os_profiles[0].operating_system == test_os_name
+      - verify_create.guest_os_profiles[0].computer_name == 'TestPC'
+      - verify_create.guest_os_profiles[0].id is defined
+
+# ============================================================
+# Idempotency - create same profile again
+# ============================================================
+
+- name: Create same profile again (idempotency)
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    operating_system: "{{ test_os_name }}"
+    computer_name: TestPC
+    full_name: Test User
+    organization_name: TestOrg
+    time_zone: 35
+    description: Ansible test guest OS profile
+    workgroup: WORKGROUP
+    gui_run_once_commands:
+      - echo hello
+      - echo world
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: create_idem
+
+- name: Assert idempotent (no change)
+  assert:
+    that:
+      - create_idem.changed == false
+
+# ============================================================
+# Check mode - update guest OS profile
+# ============================================================
+
+- name: Check mode - Update computer name
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    computer_name: UpdatedPC
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  check_mode: true
+  register: check_update
+
+- name: Assert check mode update reports changed
+  assert:
+    that:
+      - check_update.changed == true
+
+- name: Verify check mode did not update
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_update
+
+- name: Assert computer name unchanged after check mode
+  assert:
+    that:
+      - post_check_update.guest_os_profiles[0].computer_name == 'TestPC'
+
+# ============================================================
+# Update guest OS profile
+# ============================================================
+
+- name: Update computer name and full name
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    computer_name: UpdatedPC
+    full_name: Updated User
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_profile
+
+- name: Assert profile updated
+  assert:
+    that:
+      - update_profile.changed == true
+      - update_profile.guest_os_profile.computer_name == 'UpdatedPC'
+      - update_profile.guest_os_profile.full_name == 'Updated User'
+
+- name: Update same values (idempotency)
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    computer_name: UpdatedPC
+    full_name: Updated User
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_idem
+
+- name: Assert update idempotent
+  assert:
+    that:
+      - update_idem.changed == false
+
+- name: Verify update via info module
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info shows updated values
+  assert:
+    that:
+      - verify_update.guest_os_profiles[0].computer_name == 'UpdatedPC'
+      - verify_update.guest_os_profiles[0].full_name == 'Updated User'
+
+# ============================================================
+# Update description
+# ============================================================
+
+- name: Update description
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    description: Updated description
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_desc
+
+- name: Assert description updated
+  assert:
+    that:
+      - update_desc.changed == true
+      - update_desc.guest_os_profile.description == 'Updated description'
+
+# ============================================================
+# Update gui run once commands
+# ============================================================
+
+- name: Update gui run once commands
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    gui_run_once_commands:
+      - echo updated
+      - echo commands
+      - echo third
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_gui_cmds
+
+- name: Assert gui run once commands updated
+  assert:
+    that:
+      - update_gui_cmds.changed == true
+      - update_gui_cmds.guest_os_profile.gui_run_once_commands | length == 3
+      - update_gui_cmds.guest_os_profile.gui_run_once_commands[0] == 'echo updated'
+
+- name: Update gui run once commands idempotency
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    gui_run_once_commands:
+      - echo updated
+      - echo commands
+      - echo third
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_gui_cmds_idem
+
+- name: Assert gui run once commands update idempotent
+  assert:
+    that:
+      - update_gui_cmds_idem.changed == false
+
+# ============================================================
+# Update time zone
+# ============================================================
+
+- name: Update time zone
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    time_zone: 85
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_tz
+
+- name: Assert time zone updated
+  assert:
+    that:
+      - update_tz.changed == true
+      - update_tz.guest_os_profile.time_zone == 85
+
+# ============================================================
+# Update owner
+# ============================================================
+
+- name: Update owner
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    owner: "SCVMM\\Administrator"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+  register: update_owner
+
+- name: Assert owner update
+  assert:
+    that:
+      - update_owner.guest_os_profile.owner == 'SCVMM\Administrator'
+
+# ============================================================
+# Info module - check mode
+# ============================================================
+
+- name: Info - check mode query
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: info_check_mode
+
+- name: Assert info check mode returns data
+  assert:
+    that:
+      - info_check_mode.changed == false
+      - info_check_mode.guest_os_profiles | length == 1
+
+# ============================================================
+# Verify all params via info module
+# ============================================================
+
+- name: Verify all params via info module
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all
+
+- name: Assert info shows all values
+  assert:
+    that:
+      - verify_all.guest_os_profiles[0].gui_run_once_commands | length == 3
+      - verify_all.guest_os_profiles[0].time_zone == 85
+      - verify_all.guest_os_profiles[0].workgroup == 'WORKGROUP'
+      - verify_all.guest_os_profiles[0].creation_time is defined
+      - verify_all.guest_os_profiles[0].owner == 'SCVMM\Administrator'
+      - verify_all.guest_os_profiles[0].auto_logon_count is defined
+      - verify_all.guest_os_profiles[0].linux_domain_name is defined
+      - verify_all.guest_os_profiles[0].operating_system is defined
+      - verify_all.guest_os_profiles[0].domain is defined
+      - verify_all.guest_os_profiles[0].domain_join_organizational_unit is defined
+      - verify_all.guest_os_profiles[0].shielded is defined
+
+# ============================================================
+# Check mode - remove guest OS profile
+# ============================================================
+
+- name: Check mode - Remove guest OS profile
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove
+
+- name: Assert check mode remove reports changed
+  assert:
+    that:
+      - check_remove.changed == true
+
+- name: Verify check mode did not remove profile
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_check_remove
+
+- name: Assert profile still exists after check mode
+  assert:
+    that:
+      - post_check_remove.guest_os_profiles | length == 1
+
+# ============================================================
+# Remove guest OS profile
+# ============================================================
+
+- name: Remove guest OS profile
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_profile
+
+- name: Assert profile removed
+  assert:
+    that:
+      - remove_profile.changed == true
+
+- name: Verify profile removed via info module
+  microsoft.scvmm.scvmm_guest_os_profile_info:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: post_remove
+
+- name: Assert profile no longer exists
+  assert:
+    that:
+      - post_remove.guest_os_profiles | length == 0
+
+# ============================================================
+# Remove idempotency
+# ============================================================
+
+- name: Remove again (idempotency)
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  register: remove_idem
+
+- name: Assert remove idempotent
+  assert:
+    that:
+      - remove_idem.changed == false
+
+- name: Check mode - remove when already absent
+  microsoft.scvmm.scvmm_guest_os_profile:
+    name: "{{ test_gos_profile }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: absent
+  check_mode: true
+  register: check_remove_noop
+
+- name: Assert check mode absent no-op
+  assert:
+    that:
+      - check_remove_noop.changed == false
