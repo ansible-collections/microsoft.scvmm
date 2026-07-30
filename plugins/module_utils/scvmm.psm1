@@ -292,6 +292,8 @@ Human-readable type name for error messages (e.g. 'storage classification').
 If $true, fails the module when no object is found. Default $false.
 .PARAMETER FilterScript
 Optional scriptblock for client-side filtering (e.g. for cmdlets without -Name parameter).
+.PARAMETER AllowMultiple
+If $true, returns all matching objects instead of failing when multiple are found. Default $false.
 #>
 function Get-SCVMMObject {
     param (
@@ -310,7 +312,9 @@ function Get-SCVMMObject {
 
         [bool]$FailIfNotFound = $false,
 
-        [scriptblock]$FilterScript
+        [scriptblock]$FilterScript,
+
+        [bool]$AllowMultiple = $false
     )
 
     $typeName = if ($ObjectType) { $ObjectType } else { $CmdletName -replace '^Get-SC', '' }
@@ -331,7 +335,7 @@ function Get-SCVMMObject {
     }
 
     if ($Name -or $FilterScript) {
-        if ($objects.Count -gt 1) {
+        if (-not $AllowMultiple -and $objects.Count -gt 1) {
             $Module.FailJson("Multiple ${typeName} found with name '$Name'")
         }
         if ($objects.Count -eq 0) {
@@ -339,6 +343,9 @@ function Get-SCVMMObject {
                 $Module.FailJson("${typeName} '$Name' not found")
             }
             return $null
+        }
+        if ($AllowMultiple) {
+            return $objects
         }
         return $objects[0]
     }
