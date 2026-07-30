@@ -1,0 +1,32 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_user_role_quota: "AnsibleTest_QuotaRole_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Create test user role for quota tests
+      microsoft.scvmm.scvmm_user_role:
+        name: "{{ test_user_role_quota }}"
+        description: "Temporary role for quota testing"
+        user_role_profile: SelfServiceUser
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Setup - Add cloud scope to user role so quotas exist
+      ansible.windows.win_shell: |
+        Import-Module VirtualMachineManager
+        $vmm = Get-SCVMMServer -ComputerName "localhost"
+        $role = Get-SCUserRole -VMMServer $vmm -Name "{{ test_user_role_quota }}"
+        $cloud = (Get-SCCloud -VMMServer $vmm)[0]
+        Set-SCUserRole -UserRole $role -AddScope $cloud -ErrorAction Stop | Out-Null
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test user role
+      microsoft.scvmm.scvmm_user_role:
+        name: "{{ test_user_role_quota }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true

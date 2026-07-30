@@ -1,0 +1,311 @@
+---
+# ── Info: query all quotas for user role ──
+- name: Info - Query all quotas for test role
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: all_quotas
+
+- name: Assert info returns quotas
+  ansible.builtin.assert:
+    that:
+      - all_quotas.user_role_quotas is defined
+      - all_quotas.user_role_quotas | length > 0
+
+# ── User role info: filter by member ──
+- name: Info - Query user roles by member (Administrator)
+  microsoft.scvmm.scvmm_user_role_info:
+    member: "SCVMM\\Administrator"
+    vmm_server: "{{ scvmm_server }}"
+  register: member_roles
+
+- name: Assert Administrator is a member of at least one role
+  ansible.builtin.assert:
+    that:
+      - member_roles.user_roles | length > 0
+      - "'Administrator' in (member_roles.user_roles | map(attribute='name') | list)"
+
+- name: Info - Query user roles by non-existent member
+  microsoft.scvmm.scvmm_user_role_info:
+    member: "NONEXISTENT\\NoSuchUser"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_member_roles
+
+- name: Assert non-existent member returns empty list
+  ansible.builtin.assert:
+    that:
+      - no_member_roles.user_roles | length == 0
+
+# ── Info: query role-level quota ──
+- name: Info - Query role-level quota
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: false
+    vmm_server: "{{ scvmm_server }}"
+  register: role_quota
+
+- name: Assert role-level quota returned
+  ansible.builtin.assert:
+    that:
+      - role_quota.user_role_quotas | length == 1
+      - role_quota.user_role_quotas[0].quota_per_user == false
+
+# ── Info: query per-user quota ──
+- name: Info - Query per-user quota
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: true
+    vmm_server: "{{ scvmm_server }}"
+  register: per_user_quota
+
+- name: Assert per-user quota returned
+  ansible.builtin.assert:
+    that:
+      - per_user_quota.user_role_quotas | length == 1
+      - per_user_quota.user_role_quotas[0].quota_per_user == true
+
+# ── Info: check mode ──
+- name: Info - Query in check mode
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: info_check_mode
+
+- name: Assert info works in check mode
+  ansible.builtin.assert:
+    that:
+      - info_check_mode.user_role_quotas is defined
+      - info_check_mode is not changed
+
+# ── Info: verify all return fields ──
+- name: Info - Verify all return fields
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: false
+    vmm_server: "{{ scvmm_server }}"
+  register: info_fields
+
+- name: Assert all info return fields are present
+  ansible.builtin.assert:
+    that:
+      - info_fields.user_role_quotas[0].id is defined
+      - info_fields.user_role_quotas[0].user_role_name == test_user_role_quota
+      - info_fields.user_role_quotas[0].vm_count is defined
+      - info_fields.user_role_quotas[0].cpu_count is defined
+      - info_fields.user_role_quotas[0].memory_mb is defined
+      - info_fields.user_role_quotas[0].storage_gb is defined
+      - info_fields.user_role_quotas[0].custom_quota_count is defined
+      - info_fields.user_role_quotas[0].quota_per_user is defined
+
+# ── Check mode: update vm_count ──
+- name: Check mode - Update VM count
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    vm_count: 5
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_update
+
+- name: Assert check mode reports changed
+  ansible.builtin.assert:
+    that:
+      - check_update is changed
+
+- name: Verify check mode did not update
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: false
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_update
+
+- name: Assert VM count unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_update.user_role_quotas[0].vm_count != 5
+
+# ── Update vm_count ──
+- name: Update VM count
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    vm_count: 10
+    vmm_server: "{{ scvmm_server }}"
+  register: update_vm
+
+- name: Assert VM count was updated
+  ansible.builtin.assert:
+    that:
+      - update_vm is changed
+      - update_vm.user_role_quota.vm_count == 10
+
+# ── Verify update with info module ──
+- name: Verify VM count update via info module
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: false
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_vm_update
+
+- name: Assert info module sees updated VM count
+  ansible.builtin.assert:
+    that:
+      - verify_vm_update.user_role_quotas[0].vm_count == 10
+
+# ── Update vm_count idempotency ──
+- name: Update same VM count (idempotency)
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    vm_count: 10
+    vmm_server: "{{ scvmm_server }}"
+  register: vm_idempotent
+
+- name: Assert update idempotent
+  ansible.builtin.assert:
+    that:
+      - vm_idempotent is not changed
+
+# ── Update cpu_count ──
+- name: Update CPU count
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    cpu_count: 20
+    vmm_server: "{{ scvmm_server }}"
+  register: update_cpu
+
+- name: Assert CPU count was updated
+  ansible.builtin.assert:
+    that:
+      - update_cpu is changed
+      - update_cpu.user_role_quota.cpu_count == 20
+
+# ── Update memory_mb ──
+- name: Update memory MB
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    memory_mb: 8192
+    vmm_server: "{{ scvmm_server }}"
+  register: update_mem
+
+- name: Assert memory was updated
+  ansible.builtin.assert:
+    that:
+      - update_mem is changed
+      - update_mem.user_role_quota.memory_mb == 8192
+
+# ── Update storage_gb ──
+- name: Update storage GB
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    storage_gb: 500
+    vmm_server: "{{ scvmm_server }}"
+  register: update_storage
+
+- name: Assert storage was updated
+  ansible.builtin.assert:
+    that:
+      - update_storage is changed
+      - update_storage.user_role_quota.storage_gb == 500
+
+# ── Update use_vm_count_maximum (write-only parameter) ──
+- name: Set unlimited VM count
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    use_vm_count_maximum: true
+    vmm_server: "{{ scvmm_server }}"
+  register: update_unlimited
+
+- name: Assert unlimited VM count was set
+  ansible.builtin.assert:
+    that:
+      - update_unlimited is changed
+      - update_unlimited.user_role_quota.vm_count is none
+
+# ── Verify unlimited via info ──
+- name: Verify unlimited VM count via info
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: false
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_unlimited
+
+- name: Assert unlimited VM count shows as null in info
+  ansible.builtin.assert:
+    that:
+      - verify_unlimited.user_role_quotas[0].vm_count is none
+
+# ── use_vm_count_maximum idempotency ──
+- name: Set unlimited VM count again (idempotency)
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    use_vm_count_maximum: true
+    vmm_server: "{{ scvmm_server }}"
+  register: unlimited_idempotent
+
+- name: Assert unlimited is idempotent
+  ansible.builtin.assert:
+    that:
+      - unlimited_idempotent is not changed
+
+# ── Mutually exclusive: vm_count + use_vm_count_maximum ──
+- name: Fail when vm_count and use_vm_count_maximum both set
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    vm_count: 10
+    use_vm_count_maximum: true
+    vmm_server: "{{ scvmm_server }}"
+  register: mutual_exclusive_result
+  ignore_errors: true
+
+- name: Assert mutually exclusive error
+  ansible.builtin.assert:
+    that:
+      - mutual_exclusive_result is failed
+      - "'mutually exclusive' in mutual_exclusive_result.msg"
+
+# ── Update per-user quota ──
+- name: Update per-user quota VM count
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: true
+    vm_count: 3
+    vmm_server: "{{ scvmm_server }}"
+  register: update_per_user
+
+- name: Assert per-user quota was updated
+  ansible.builtin.assert:
+    that:
+      - update_per_user is changed
+      - update_per_user.user_role_quota.vm_count == 3
+      - update_per_user.user_role_quota.quota_per_user == true
+
+# ── Verify per-user update via info ──
+- name: Verify per-user quota via info
+  microsoft.scvmm.scvmm_user_role_quota_info:
+    user_role_name: "{{ test_user_role_quota }}"
+    quota_per_user: true
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_per_user
+
+- name: Assert per-user info shows updated value
+  ansible.builtin.assert:
+    that:
+      - verify_per_user.user_role_quotas[0].vm_count == 3
+      - verify_per_user.user_role_quotas[0].quota_per_user == true
+
+# ── Multiple updates at once ──
+- name: Update multiple quota values at once
+  microsoft.scvmm.scvmm_user_role_quota:
+    user_role_name: "{{ test_user_role_quota }}"
+    vm_count: 15
+    cpu_count: 30
+    memory_mb: 16384
+    vmm_server: "{{ scvmm_server }}"
+  register: multi_update
+
+- name: Assert multiple values updated
+  ansible.builtin.assert:
+    that:
+      - multi_update is changed
+      - multi_update.user_role_quota.vm_count == 15
+      - multi_update.user_role_quota.cpu_count == 30
+      - multi_update.user_role_quota.memory_mb == 16384
