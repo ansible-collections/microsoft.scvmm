@@ -1,0 +1,27 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_user_role: "AnsibleTest_UserRole_{{ 99999 | random }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test user role
+      microsoft.scvmm.scvmm_user_role:
+        name: "{{ test_user_role }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate user role removed
+      microsoft.scvmm.scvmm_user_role_info:
+        name: "{{ test_user_role }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      ansible.builtin.assert:
+        that:
+          - teardown_validate.user_roles | length == 0
