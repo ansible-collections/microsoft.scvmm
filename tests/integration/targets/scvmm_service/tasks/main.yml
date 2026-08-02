@@ -1,0 +1,46 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_service_name: "AnsibleTest_Svc_{{ 99999 | random }}"
+    test_service_template_name: "AnsibleTest_SvcTmpl_{{ 99999 | random }}"
+
+- name: Setup - Create service template for testing
+  ansible.windows.win_shell: |
+    Import-Module VirtualMachineManager
+    New-SCServiceTemplate -Name "{{ test_service_template_name }}" -Release "1.0" -VMMServer localhost | Select-Object Name, ID | Format-List
+  register: setup_template
+
+- name: Setup - Verify template created
+  ansible.builtin.assert:
+    that:
+      - setup_template is not failed
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test service
+      microsoft.scvmm.scvmm_service:
+        name: "{{ test_service_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate service removed
+      microsoft.scvmm.scvmm_service_info:
+        name: "{{ test_service_name }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert service is clean
+      ansible.builtin.assert:
+        that:
+          - teardown_validate.services | length == 0
+
+    - name: Teardown - Remove test service template
+      ansible.windows.win_shell: |
+        Import-Module VirtualMachineManager
+        $t = Get-SCServiceTemplate -Name "{{ test_service_template_name }}" -VMMServer localhost
+        if ($t) { Remove-SCServiceTemplate -ServiceTemplate $t | Out-Null; Write-Output "removed" } else { Write-Output "not found" }
+      ignore_errors: true

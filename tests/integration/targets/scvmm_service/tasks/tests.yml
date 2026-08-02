@@ -1,0 +1,431 @@
+---
+# ── Create service ──
+- name: Create service
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    service_template: "{{ test_service_template_name }}"
+    cloud: "{{ test_cloud_name }}"
+    description: "AnsibleTest service"
+    service_priority: Normal
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert service was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.service.name == test_service_name
+      - create_result.service.description == "AnsibleTest service"
+      - create_result.service.service_priority == "Normal"
+      - create_result.service.id is not none
+      - create_result.service.cloud_name == test_cloud_name
+      - create_result.service.service_template_name == test_service_template_name
+      - create_result.service.service_template_release is not none
+      - create_result.service.deployment_state is not none
+      - create_result.service.enabled is not none
+      - create_result.service.creation_time is not none
+
+# ── Verify creation with info module ──
+- name: Verify service exists via info module
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created service
+  ansible.builtin.assert:
+    that:
+      - verify_create.services | length == 1
+      - verify_create.services[0].name == test_service_name
+      - verify_create.services[0].id is not none
+      - verify_create.services[0].description == "AnsibleTest service"
+      - verify_create.services[0].cloud_name == test_cloud_name
+      - verify_create.services[0].service_template_name == test_service_template_name
+      - verify_create.services[0].service_template_release is not none
+      - verify_create.services[0].deployment_state is not none
+      - verify_create.services[0].enabled is not none
+      - verify_create.services[0].creation_time is not none
+      - verify_create.services[0].modified_time is not none
+
+# ── Info: query all ──
+- name: Get all services
+  microsoft.scvmm.scvmm_service_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_services
+
+- name: Assert test service appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_services.services | length > 0
+      - test_service_name in (all_services.services | map(attribute='name') | list)
+
+# ── Info: filter by cloud ──
+- name: Get services filtered by cloud
+  microsoft.scvmm.scvmm_service_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: cloud_filtered
+
+- name: Assert cloud filter returns test service
+  ansible.builtin.assert:
+    that:
+      - cloud_filtered.services | length > 0
+      - test_service_name in (cloud_filtered.services | map(attribute='name') | list)
+      - cloud_filtered.services | map(attribute='cloud_name') | unique | list == [test_cloud_name]
+
+- name: Get services filtered by non-existent cloud
+  microsoft.scvmm.scvmm_service_info:
+    cloud: "NonExistent_Cloud_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_cloud_services
+
+- name: Assert non-existent cloud returns empty list
+  ansible.builtin.assert:
+    that:
+      - no_cloud_services.services | length == 0
+
+# ── Info: query non-existent ──
+- name: Get non-existent service
+  microsoft.scvmm.scvmm_service_info:
+    name: "NonExistent_Svc_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.services | length == 0
+
+# ── Idempotency ──
+- name: Create same service again
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    description: "AnsibleTest service"
+    service_priority: Normal
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update service description
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    description: "Updated test description"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_desc_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_desc_result is changed
+      - update_desc_result.service.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.services[0].description == "Updated test description"
+
+# ── Update service priority ──
+- name: Update service priority to High
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    service_priority: High
+    vmm_server: "{{ scvmm_server }}"
+  register: update_priority_result
+
+- name: Assert priority was updated
+  ansible.builtin.assert:
+    that:
+      - update_priority_result is changed
+      - update_priority_result.service.service_priority == "High"
+
+# ── Verify priority update ──
+- name: Verify priority update via info module
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_priority
+
+- name: Assert info module sees updated priority
+  ansible.builtin.assert:
+    that:
+      - verify_priority.services[0].service_priority == "High"
+
+# ── Update cost center ──
+- name: Update service cost center
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    cost_center: "IT-Ops"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_cost_result
+
+- name: Assert cost center was updated
+  ansible.builtin.assert:
+    that:
+      - update_cost_result is changed
+      - update_cost_result.service.cost_center == "IT-Ops"
+
+# ── Verify cost center update ──
+- name: Verify cost center update via info module
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_cost
+
+- name: Assert info module sees updated cost center
+  ansible.builtin.assert:
+    that:
+      - verify_cost.services[0].cost_center == "IT-Ops"
+
+# ── Cost center idempotency ──
+- name: Update cost center with same value
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    cost_center: "IT-Ops"
+    vmm_server: "{{ scvmm_server }}"
+  register: cost_idempotent
+
+- name: Assert cost center update is idempotent
+  ansible.builtin.assert:
+    that:
+      - cost_idempotent is not changed
+
+# ── Update owner ──
+- name: Update service owner
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    owner: "SCVMM\\Administrator"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_owner_result
+
+- name: Assert owner was updated
+  ansible.builtin.assert:
+    that:
+      - update_owner_result is changed
+      - update_owner_result.service.owner == "SCVMM\\Administrator"
+
+# ── Verify owner update ──
+- name: Verify owner update via info module
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_owner
+
+- name: Assert info module sees updated owner
+  ansible.builtin.assert:
+    that:
+      - verify_owner.services[0].owner == "SCVMM\\Administrator"
+
+# ── Check mode: no-op (idempotency) ──
+- name: Check mode with no changes
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    description: "Updated test description"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_noop
+
+- name: Assert check mode reports no change when nothing changed
+  ansible.builtin.assert:
+    that:
+      - check_mode_noop is not changed
+
+# ── Check mode: update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    description: "Check mode description"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode.services[0].description == "Updated test description"
+
+# ── Check mode: create ──
+- name: Create service in check mode
+  microsoft.scvmm.scvmm_service:
+    name: "AnsibleTest_CheckMode_{{ 99999 | random }}"
+    service_template: "{{ test_service_template_name }}"
+    cloud: "{{ test_cloud_name }}"
+    description: "Should not be created"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_create
+
+- name: Assert check mode create reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_create is changed
+      - check_mode_create.service.id is none
+
+# ── Create without service_template fails ──
+- name: Attempt to create service without service_template
+  microsoft.scvmm.scvmm_service:
+    name: "AnsibleTest_NoTemplate_{{ 99999 | random }}"
+    cloud: "{{ test_cloud_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_template_result
+  ignore_errors: true
+
+- name: Assert create without service_template fails
+  ansible.builtin.assert:
+    that:
+      - no_template_result is failed
+      - "'service_template' in no_template_result.msg"
+
+# ── Create without cloud fails ──
+- name: Attempt to create service without cloud
+  microsoft.scvmm.scvmm_service:
+    name: "AnsibleTest_NoCloud_{{ 99999 | random }}"
+    service_template: "{{ test_service_template_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_cloud_result
+  ignore_errors: true
+
+- name: Assert create without cloud fails
+  ansible.builtin.assert:
+    that:
+      - no_cloud_result is failed
+      - "'cloud' in no_cloud_result.msg"
+
+# ── Info: filter by name and cloud ──
+- name: Get service filtered by name and cloud
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: name_cloud_filtered
+
+- name: Assert name+cloud filter returns test service
+  ansible.builtin.assert:
+    that:
+      - name_cloud_filtered.services | length == 1
+      - name_cloud_filtered.services[0].name == test_service_name
+      - name_cloud_filtered.services[0].cloud_name == test_cloud_name
+
+- name: Get service filtered by name and wrong cloud
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    cloud: "NonExistent_Cloud_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: name_wrong_cloud
+
+- name: Assert name+wrong cloud returns empty
+  ansible.builtin.assert:
+    that:
+      - name_wrong_cloud.services | length == 0
+
+# ── Cloud disambiguation on update ──
+- name: Update service with cloud disambiguation
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    cloud: "{{ test_cloud_name }}"
+    description: "Cloud-scoped update"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: cloud_update_result
+
+- name: Assert cloud-scoped update worked
+  ansible.builtin.assert:
+    that:
+      - cloud_update_result is changed
+      - cloud_update_result.service.description == "Cloud-scoped update"
+
+- name: Revert description for subsequent tests
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    description: "Updated test description"
+    vmm_server: "{{ scvmm_server }}"
+
+# ── Check mode: delete ──
+- name: Delete service in check mode
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode delete reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify service still exists after check mode delete
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_delete
+
+- name: Assert service was not deleted by check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_delete.services | length == 1
+
+# ── Delete service ──
+- name: Delete service
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert service was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify service is gone via info module
+  microsoft.scvmm.scvmm_service_info:
+    name: "{{ test_service_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted service
+  ansible.builtin.assert:
+    that:
+      - verify_delete.services | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted service
+  microsoft.scvmm.scvmm_service:
+    name: "{{ test_service_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed
