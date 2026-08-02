@@ -1,0 +1,475 @@
+---
+# ── Create service template ──
+- name: Create service template
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    description: "AnsibleTest service template"
+    release: "1.0"
+    service_priority: Normal
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert service template was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.service_template.name == test_service_template_name
+      - create_result.service_template.description == "AnsibleTest service template"
+      - create_result.service_template.release == "1.0"
+      - create_result.service_template.service_priority == "Normal"
+      - create_result.service_template.id is defined
+      - create_result.service_template.is_published == false
+
+# ── Verify creation with info module ──
+- name: Verify service template exists via info module
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created service template
+  ansible.builtin.assert:
+    that:
+      - verify_create.service_templates | length == 1
+      - verify_create.service_templates[0].name == test_service_template_name
+      - verify_create.service_templates[0].id is defined
+      - verify_create.service_templates[0].release == "1.0"
+      - verify_create.service_templates[0].service_priority == "Normal"
+      - verify_create.service_templates[0].is_published == false
+      - verify_create.service_templates[0].enabled is defined
+      - verify_create.service_templates[0].creation_time is defined
+      - verify_create.service_templates[0].modified_time is defined
+
+# ── Info: query all ──
+- name: Get all service templates
+  microsoft.scvmm.scvmm_service_template_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_templates
+
+- name: Assert test service template appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_templates.service_templates | length > 0
+      - test_service_template_name in (all_templates.service_templates | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Get non-existent service template
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "NonExistent_SvcTmpl_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.service_templates | length == 0
+
+# ── Idempotency ──
+- name: Create same service template again
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    description: "AnsibleTest service template"
+    release: "1.0"
+    service_priority: Normal
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update service template description
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    description: "Updated test description"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_desc_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_desc_result is changed
+      - update_desc_result.service_template.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.service_templates[0].description == "Updated test description"
+
+# ── Update description idempotency ──
+- name: Update description again with same value
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    description: "Updated test description"
+    vmm_server: "{{ scvmm_server }}"
+  register: desc_idempotent
+
+- name: Assert description update is idempotent
+  ansible.builtin.assert:
+    that:
+      - desc_idempotent is not changed
+
+# ── Update service priority ──
+- name: Update service template priority to High
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    service_priority: High
+    vmm_server: "{{ scvmm_server }}"
+  register: update_priority_result
+
+- name: Assert priority was updated
+  ansible.builtin.assert:
+    that:
+      - update_priority_result is changed
+      - update_priority_result.service_template.service_priority == "High"
+
+# ── Verify priority update ──
+- name: Verify priority update via info module
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_priority
+
+- name: Assert info module sees updated priority
+  ansible.builtin.assert:
+    that:
+      - verify_priority.service_templates[0].service_priority == "High"
+
+# ── Update release ──
+- name: Update service template release
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    release: "2.0"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_release_result
+
+- name: Assert release was updated
+  ansible.builtin.assert:
+    that:
+      - update_release_result is changed
+      - update_release_result.service_template.release == "2.0"
+
+# ── Update use_as_default_release ──
+- name: Set use_as_default_release
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    use_as_default_release: true
+    vmm_server: "{{ scvmm_server }}"
+  register: update_default_release
+
+- name: Assert use_as_default_release was set
+  ansible.builtin.assert:
+    that:
+      - update_default_release is changed
+      - update_default_release.service_template.use_as_default_release == true
+
+# ── Update owner ──
+- name: Update service template owner
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    owner: "SCVMM\\Administrator"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_owner_result
+
+- name: Assert owner was updated
+  ansible.builtin.assert:
+    that:
+      - update_owner_result is changed
+      - update_owner_result.service_template.owner == "SCVMM\\Administrator"
+
+# ── Verify owner update ──
+- name: Verify owner update via info module
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_owner
+
+- name: Assert info module sees updated owner
+  ansible.builtin.assert:
+    that:
+      - verify_owner.service_templates[0].owner == "SCVMM\\Administrator"
+
+# ── Publish service template ──
+- name: Publish service template
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    published: true
+    vmm_server: "{{ scvmm_server }}"
+  register: publish_result
+
+- name: Assert service template was published
+  ansible.builtin.assert:
+    that:
+      - publish_result is changed
+      - publish_result.service_template.is_published == true
+
+# ── Verify published via info ──
+- name: Verify published via info module
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_published
+
+- name: Assert info module sees published status
+  ansible.builtin.assert:
+    that:
+      - verify_published.service_templates[0].is_published == true
+
+# ── Published idempotency ──
+- name: Publish service template again
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    published: true
+    vmm_server: "{{ scvmm_server }}"
+  register: publish_idempotent
+
+- name: Assert publish is idempotent
+  ansible.builtin.assert:
+    that:
+      - publish_idempotent is not changed
+
+# ── Check mode: update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    description: "Check mode description"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode.service_templates[0].description == "Updated test description"
+
+# ── Check mode: create ──
+- name: Create service template in check mode
+  microsoft.scvmm.scvmm_service_template:
+    name: "AnsibleTest_CheckMode_{{ 99999 | random }}"
+    release: "1.0"
+    description: "Should not be created"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_create
+
+- name: Assert check mode create reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_create is changed
+      - check_mode_create.service_template.id is none
+
+# ── Create without release fails ──
+- name: Attempt to create service template without release
+  microsoft.scvmm.scvmm_service_template:
+    name: "AnsibleTest_NoRelease_{{ 99999 | random }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_release_result
+  ignore_errors: true
+
+- name: Assert create without release fails
+  ansible.builtin.assert:
+    that:
+      - no_release_result is failed
+      - "'release' in no_release_result.msg"
+
+# ── Multi-release: create second release ──
+- name: Create second release of the same service template
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    description: "Release 3.0 template"
+    release: "3.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_release2
+
+- name: Assert second release was created
+  ansible.builtin.assert:
+    that:
+      - create_release2 is changed
+      - create_release2.service_template.release == "3.0"
+      - create_release2.service_template.description == "Release 3.0 template"
+
+# ── Multi-release: info returns all releases ──
+- name: Get all releases by name
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: multi_release_info
+
+- name: Assert info returns both releases
+  ansible.builtin.assert:
+    that:
+      - multi_release_info.service_templates | length == 2
+      - '"2.0" in (multi_release_info.service_templates | map(attribute="release") | list)'
+      - '"3.0" in (multi_release_info.service_templates | map(attribute="release") | list)'
+
+# ── Multi-release: info filter by release ──
+- name: Get specific release via info module
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    release: "2.0"
+    vmm_server: "{{ scvmm_server }}"
+  register: single_release_info
+
+- name: Assert info returns only the filtered release
+  ansible.builtin.assert:
+    that:
+      - single_release_info.service_templates | length == 1
+      - single_release_info.service_templates[0].release == "2.0"
+
+# ── Multi-release: update specific release ──
+- name: Update release 3.0 description
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    release: "3.0"
+    description: "Updated release 3.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_release2
+
+- name: Assert release 3.0 was updated
+  ansible.builtin.assert:
+    that:
+      - update_release2 is changed
+      - update_release2.service_template.description == "Updated release 3.0"
+
+- name: Verify release 2.0 is unchanged
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    release: "2.0"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_release1_unchanged
+
+- name: Assert release 2.0 description was not affected
+  ansible.builtin.assert:
+    that:
+      - verify_release1_unchanged.service_templates[0].description == "Updated test description"
+
+# ── Multi-release: update without release fails ──
+- name: Attempt update without release when multiple exist
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    description: "Should fail"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_release_multi
+  ignore_errors: true
+
+- name: Assert update fails with disambiguation message
+  ansible.builtin.assert:
+    that:
+      - no_release_multi is failed
+      - "'Multiple service templates found' in no_release_multi.msg"
+
+# ── Multi-release: delete specific release ──
+- name: Delete release 3.0
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    release: "3.0"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_release2
+
+- name: Assert release 3.0 was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_release2 is changed
+
+- name: Verify release 2.0 still exists
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_after_partial_delete
+
+- name: Assert only release 2.0 remains
+  ansible.builtin.assert:
+    that:
+      - verify_after_partial_delete.service_templates | length == 1
+      - verify_after_partial_delete.service_templates[0].release == "2.0"
+
+# ── Check mode: delete ──
+- name: Delete service template in check mode
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode delete reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify service template still exists after check mode delete
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_delete
+
+- name: Assert service template was not deleted by check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_delete.service_templates | length == 1
+
+# ── Delete service template ──
+- name: Delete service template
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert service template was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify service template is gone via info module
+  microsoft.scvmm.scvmm_service_template_info:
+    name: "{{ test_service_template_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted service template
+  ansible.builtin.assert:
+    that:
+      - verify_delete.service_templates | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted service template
+  microsoft.scvmm.scvmm_service_template:
+    name: "{{ test_service_template_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed
