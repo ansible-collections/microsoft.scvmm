@@ -1,0 +1,27 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_run_as_account: "AnsibleTest_RunAs_{{ 99999 | random }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test Run As account
+      microsoft.scvmm.scvmm_run_as_account:
+        name: "{{ test_run_as_account }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate Run As account removed
+      microsoft.scvmm.scvmm_run_as_account_info:
+        name: "{{ test_run_as_account }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      ansible.builtin.assert:
+        that:
+          - teardown_validate.run_as_accounts | length == 0

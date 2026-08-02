@@ -1,0 +1,282 @@
+---
+# ── Info: query all Run As accounts ──
+- name: Info - Query all Run As accounts
+  microsoft.scvmm.scvmm_run_as_account_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_accounts
+
+- name: Assert info returns a list
+  ansible.builtin.assert:
+    that:
+      - all_accounts.run_as_accounts is defined
+      - all_accounts.run_as_accounts | length >= 0
+
+# ── Info: query non-existent account ──
+- name: Info - Query non-existent Run As account
+  microsoft.scvmm.scvmm_run_as_account_info:
+    name: "NonExistent_RunAs_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent account returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.run_as_accounts | length == 0
+
+# ── Info: check mode ──
+- name: Info - Query in check mode
+  microsoft.scvmm.scvmm_run_as_account_info:
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: info_check_mode
+
+- name: Assert info works in check mode
+  ansible.builtin.assert:
+    that:
+      - info_check_mode.run_as_accounts is defined
+      - info_check_mode is not changed
+
+# ── Check mode: create ──
+- name: Check mode - Create Run As account
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    description: "Ansible test Run As account"
+    username: "administrator@scvmm.local"
+    password: "{{ test_run_as_password }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_create
+
+- name: Assert check mode create reports changed
+  ansible.builtin.assert:
+    that:
+      - check_create is changed
+
+- name: Verify check mode did not create account
+  microsoft.scvmm.scvmm_run_as_account_info:
+    name: "{{ test_run_as_account }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_create
+
+- name: Assert account was not actually created
+  ansible.builtin.assert:
+    that:
+      - verify_check_create.run_as_accounts | length == 0
+
+# ── Create Run As account ──
+- name: Create Run As account
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    description: "Ansible test Run As account"
+    username: "administrator@scvmm.local"
+    password: "{{ test_run_as_password }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert Run As account was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.run_as_account.name == test_run_as_account
+      - create_result.run_as_account.description == "Ansible test Run As account"
+      - create_result.run_as_account.username is defined
+      - create_result.run_as_account.id is defined
+
+# ── Verify creation with info module ──
+- name: Verify Run As account exists via info module
+  microsoft.scvmm.scvmm_run_as_account_info:
+    name: "{{ test_run_as_account }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created account
+  ansible.builtin.assert:
+    that:
+      - verify_create.run_as_accounts | length == 1
+      - verify_create.run_as_accounts[0].name == test_run_as_account
+      - verify_create.run_as_accounts[0].id is defined
+      - verify_create.run_as_accounts[0].description == "Ansible test Run As account"
+      - verify_create.run_as_accounts[0].username is defined
+
+# ── Create idempotency (without credentials) ──
+- name: Create same account without credentials (idempotency)
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    description: "Ansible test Run As account"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Check mode: update description ──
+- name: Check mode - Update description
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    description: "Check mode updated description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_update
+
+- name: Assert check mode update reports changed
+  ansible.builtin.assert:
+    that:
+      - check_update is changed
+
+- name: Verify check mode did not update
+  microsoft.scvmm.scvmm_run_as_account_info:
+    name: "{{ test_run_as_account }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_update
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_update.run_as_accounts[0].description == "Ansible test Run As account"
+
+# ── Update description ──
+- name: Update Run As account description
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.run_as_account.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_run_as_account_info:
+    name: "{{ test_run_as_account }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.run_as_accounts[0].description == "Updated test description"
+
+# ── Update description idempotency ──
+- name: Update same description again (idempotency)
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_idempotent
+
+- name: Assert update idempotent
+  ansible.builtin.assert:
+    that:
+      - update_idempotent is not changed
+
+# ── Update credentials with update_password=always (default) ──
+- name: Update Run As account credentials (update_password=always)
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    username: "administrator@scvmm.local"
+    password: "{{ test_run_as_password }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_creds
+
+- name: Assert credentials update reports changed
+  ansible.builtin.assert:
+    that:
+      - update_creds is changed
+
+# ── Update credentials with update_password=on_create (should not change) ──
+- name: Update credentials with update_password=on_create
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    username: "administrator@scvmm.local"
+    password: "{{ test_run_as_password }}"
+    update_password: on_create
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: on_create_result
+
+- name: Assert on_create does not report changed for existing account
+  ansible.builtin.assert:
+    that:
+      - on_create_result is not changed
+
+# ── Info: query specific account returns all fields ──
+- name: Info - Query specific account for field assertions
+  microsoft.scvmm.scvmm_run_as_account_info:
+    name: "{{ test_run_as_account }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_fields
+
+- name: Assert all info return fields are present
+  ansible.builtin.assert:
+    that:
+      - info_fields.run_as_accounts[0].id is defined
+      - info_fields.run_as_accounts[0].name is defined
+      - info_fields.run_as_accounts[0].description is defined
+      - info_fields.run_as_accounts[0].username is defined
+
+# ── Create without credentials should fail ──
+- name: Create account without credentials (should fail)
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "NonExistent_RunAs_{{ 99999 | random }}"
+    description: "Should fail"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_creds_result
+  ignore_errors: true
+
+- name: Assert create without credentials fails
+  ansible.builtin.assert:
+    that:
+      - no_creds_result is failed
+      - "'username' in no_creds_result.msg or 'password' in no_creds_result.msg"
+
+# ── Delete Run As account ──
+- name: Delete Run As account
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert Run As account was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify Run As account is gone via info module
+  microsoft.scvmm.scvmm_run_as_account_info:
+    name: "{{ test_run_as_account }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted account
+  ansible.builtin.assert:
+    that:
+      - verify_delete.run_as_accounts | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted Run As account
+  microsoft.scvmm.scvmm_run_as_account:
+    name: "{{ test_run_as_account }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed
