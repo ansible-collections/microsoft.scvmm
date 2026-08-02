@@ -18,3 +18,21 @@ tags:
 dependencies:
   ansible.windows: ">=2.0.0"
 repository: https://github.com/ansible-collections/microsoft.scvmm
+homepage: https://github.com/ansible-collections/microsoft.scvmm
+issues: https://github.com/ansible-collections/microsoft.scvmm/issues
+build_ignore:
+  - .gitignore
+  - .gitattributes
+  - .github/
+  - .azure-pipelines/
+  - .claude/
+  - .claude-flow/
+  - .vscode/
+  - .ansible-lint
+  - docs/plans/
+  - tests/output/
+  - changelogs/.plugin-cache.yaml
+  - CLAUDE.md
+  - CONTRIBUTING.md
+  - codecov.yml
+  - ruvector.db
