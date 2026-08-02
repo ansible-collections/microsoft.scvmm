@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_storage_classification
+version_added: "1.0.0"
 short_description: Manage storage classifications in System Center Virtual Machine Manager
 description:
   - Create, update, or remove storage classifications in SCVMM.

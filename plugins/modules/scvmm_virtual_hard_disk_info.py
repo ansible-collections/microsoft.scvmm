@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_virtual_hard_disk_info
+version_added: "1.0.0"
 short_description: Query virtual hard disks in System Center Virtual Machine Manager
 description:
   - Retrieve information about virtual hard disks in the SCVMM library or attached to a VM.

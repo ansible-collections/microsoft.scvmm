@@ -6,6 +6,7 @@
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_clone
+version_added: "1.0.0"
 short_description: Clone a virtual machine in System Center Virtual Machine Manager
 description:
   - Clone an existing virtual machine in SCVMM.

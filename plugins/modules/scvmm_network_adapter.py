@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_network_adapter
+version_added: "1.0.0"
 short_description: Manage virtual network adapters on VMs in SCVMM
 description:
   - Add or remove virtual network adapters on virtual machines in SCVMM.

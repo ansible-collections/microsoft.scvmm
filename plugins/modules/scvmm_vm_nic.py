@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_nic
+version_added: "1.0.0"
 short_description: Configure virtual network adapter settings on VMs in SCVMM
 description:
   - Configure settings on an existing virtual network adapter.

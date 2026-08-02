@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_host_group_info
+version_added: "1.0.0"
 short_description: Query host groups in System Center Virtual Machine Manager
 description:
   - Retrieve information about host groups in SCVMM.

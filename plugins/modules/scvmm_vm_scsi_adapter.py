@@ -9,6 +9,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_scsi_adapter
+version_added: "1.0.0"
 short_description: Manage virtual SCSI adapters on SCVMM virtual machines
 description:
   - Create, update, or remove virtual SCSI adapters on SCVMM virtual machines.

@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_ip_pool
+version_added: "1.0.0"
 short_description: Manage static IP address pools in SCVMM
 description:
   - Create, update, or remove static IP address pools in System Center Virtual Machine Manager.

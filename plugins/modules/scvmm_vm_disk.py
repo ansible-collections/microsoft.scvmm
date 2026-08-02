@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_disk
+version_added: "1.0.0"
 short_description: Manage virtual disk drives on SCVMM virtual machines
 description:
   - Manages virtual disk drives on virtual machines in System Center Virtual Machine Manager.

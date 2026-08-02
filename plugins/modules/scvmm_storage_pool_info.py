@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_storage_pool_info
+version_added: "1.0.0"
 short_description: Query storage pools in System Center Virtual Machine Manager
 description:
   - Retrieve information about storage pools in SCVMM.

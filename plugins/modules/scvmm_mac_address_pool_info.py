@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_mac_address_pool_info
+version_added: "1.0.0"
 short_description: Query MAC address pools in SCVMM
 description:
   - Retrieve information about MAC address pools in SCVMM.

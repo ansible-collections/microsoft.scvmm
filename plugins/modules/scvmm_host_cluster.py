@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_host_cluster
+version_added: "1.0.0"
 short_description: Manage Hyper-V failover clusters in System Center Virtual Machine Manager
 description:
   - Create, update, or remove Hyper-V failover clusters in SCVMM.

@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_storage_pool
+version_added: "1.0.0"
 short_description: Manage storage pools in System Center Virtual Machine Manager
 description:
   - Assign storage classifications and update descriptions on existing storage pools in SCVMM.

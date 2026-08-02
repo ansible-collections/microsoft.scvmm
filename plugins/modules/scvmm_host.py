@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_host
+version_added: "1.0.0"
 short_description: Manage Hyper-V hosts in System Center Virtual Machine Manager
 description:
   - Add, update, or remove Hyper-V hosts from SCVMM management.

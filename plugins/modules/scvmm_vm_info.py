@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_info
+version_added: "1.0.0"
 short_description: Retrieve information about SCVMM virtual machines
 description:
   - Query virtual machine information from SCVMM.

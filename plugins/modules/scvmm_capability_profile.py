@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_capability_profile
+version_added: "1.0.0"
 short_description: Manage capability profiles in System Center Virtual Machine Manager
 description:
   - Create, update, and remove capability profiles in SCVMM.

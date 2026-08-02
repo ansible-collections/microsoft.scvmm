@@ -3,7 +3,8 @@ name: scvmm
 version: 1.0.0
 readme: README.md
 authors:
-  - Red Hat Ansible Content Team
+  - Hen Yaish <github.com/yaish25491>
+  - Ansible Ecosystem Engineering <github.com/eco-ansible-content>
 description: >
   Ansible collection for System Center Virtual Machine Manager (SCVMM) 2022.
   Certified for Red Hat Automation Hub.

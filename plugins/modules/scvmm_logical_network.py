@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_logical_network
+version_added: "1.0.0"
 short_description: Manage logical networks in System Center Virtual Machine Manager
 description:
   - Create, update, or remove logical networks in SCVMM.

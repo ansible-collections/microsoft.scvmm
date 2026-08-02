@@ -9,6 +9,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_checkpoint_info
+version_added: "1.0.0"
 short_description: Retrieve checkpoint information for SCVMM virtual machines
 description:
   - Query checkpoint (snapshot) information from SCVMM virtual machines.

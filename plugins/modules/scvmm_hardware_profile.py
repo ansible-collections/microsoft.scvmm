@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_hardware_profile
+version_added: "1.0.0"
 short_description: Manage hardware profiles in System Center Virtual Machine Manager
 description:
   - Create, update, and remove hardware profiles in SCVMM.
