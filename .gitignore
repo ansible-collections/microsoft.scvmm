@@ -6,3 +6,8 @@ __pycache__/
 .pytest_cache/
 tests/output/
 docs/plans/
+.claude/
+.claude-flow/
+.vscode/
+ruvector.db
+changelogs/.plugin-cache.yaml
