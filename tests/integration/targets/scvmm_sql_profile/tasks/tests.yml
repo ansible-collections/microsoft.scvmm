@@ -1,0 +1,248 @@
+---
+# ── Create SQL profile ──
+- name: Create SQL profile
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    description: "AnsibleTest SQL profile"
+    owner: "SCVMM\\Administrator"
+    tag: "ansible-test"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert SQL profile was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.sql_profile.name == test_sql_profile_name
+      - create_result.sql_profile.description == "AnsibleTest SQL profile"
+      - create_result.sql_profile.tag == "ansible-test"
+      - create_result.sql_profile.id is defined
+
+# ── Verify creation with info module ──
+- name: Verify SQL profile exists via info module
+  microsoft.scvmm.scvmm_sql_profile_info:
+    name: "{{ test_sql_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created SQL profile
+  ansible.builtin.assert:
+    that:
+      - verify_create.sql_profiles | length == 1
+      - verify_create.sql_profiles[0].name == test_sql_profile_name
+      - verify_create.sql_profiles[0].id is defined
+      - verify_create.sql_profiles[0].description == "AnsibleTest SQL profile"
+      - verify_create.sql_profiles[0].tag == "ansible-test"
+      - verify_create.sql_profiles[0].enabled is defined
+      - verify_create.sql_profiles[0].creation_time is defined
+      - verify_create.sql_profiles[0].modified_time is defined
+
+# ── Info: query all ──
+- name: Get all SQL profiles
+  microsoft.scvmm.scvmm_sql_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert test SQL profile appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_profiles.sql_profiles | length > 0
+      - test_sql_profile_name in (all_profiles.sql_profiles | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Get non-existent SQL profile
+  microsoft.scvmm.scvmm_sql_profile_info:
+    name: "NonExistent_SQLProfile_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.sql_profiles | length == 0
+
+# ── Idempotency ──
+- name: Create same SQL profile again
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    description: "AnsibleTest SQL profile"
+    owner: "SCVMM\\Administrator"
+    tag: "ansible-test"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update SQL profile description
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    description: "Updated test description"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_desc_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_desc_result is changed
+      - update_desc_result.sql_profile.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_sql_profile_info:
+    name: "{{ test_sql_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.sql_profiles[0].description == "Updated test description"
+
+# ── Update tag ──
+- name: Update SQL profile tag
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    tag: "updated-tag"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_tag_result
+
+- name: Assert tag was updated
+  ansible.builtin.assert:
+    that:
+      - update_tag_result is changed
+      - update_tag_result.sql_profile.tag == "updated-tag"
+
+# ── Verify tag update with info module ──
+- name: Verify tag update via info module
+  microsoft.scvmm.scvmm_sql_profile_info:
+    name: "{{ test_sql_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_tag
+
+- name: Assert info module sees updated tag
+  ansible.builtin.assert:
+    that:
+      - verify_tag.sql_profiles[0].tag == "updated-tag"
+
+# ── Update owner ──
+- name: Update SQL profile owner
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    owner: "SCVMM\\Administrator"
+    vmm_server: "{{ scvmm_server }}"
+  register: update_owner_result
+
+- name: Assert owner update is idempotent (same owner)
+  ansible.builtin.assert:
+    that:
+      - update_owner_result is not changed
+
+# ── Check mode: update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    description: "Check mode description"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_sql_profile_info:
+    name: "{{ test_sql_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode.sql_profiles[0].description == "Updated test description"
+
+# ── Check mode: create ──
+- name: Create SQL profile in check mode
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "AnsibleTest_CheckMode_{{ 99999 | random }}"
+    description: "Should not be created"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_create
+
+- name: Assert check mode create reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_create is changed
+      - check_mode_create.sql_profile.id is none
+
+# ── Check mode: delete ──
+- name: Delete SQL profile in check mode
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode delete reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify SQL profile still exists after check mode delete
+  microsoft.scvmm.scvmm_sql_profile_info:
+    name: "{{ test_sql_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_delete
+
+- name: Assert SQL profile was not deleted by check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_delete.sql_profiles | length == 1
+
+# ── Delete SQL profile ──
+- name: Delete SQL profile
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert SQL profile was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify SQL profile is gone via info module
+  microsoft.scvmm.scvmm_sql_profile_info:
+    name: "{{ test_sql_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted SQL profile
+  ansible.builtin.assert:
+    that:
+      - verify_delete.sql_profiles | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted SQL profile
+  microsoft.scvmm.scvmm_sql_profile:
+    name: "{{ test_sql_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed
