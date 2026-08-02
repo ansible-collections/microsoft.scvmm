@@ -1,6 +1,6 @@
 # Microsoft SCVMM Collection for Ansible
 
-[![CI](https://github.com/ansible-collections/microsoft.scvmm/workflows/CI/badge.svg?event=push)](https://github.com/ansible-collections/microsoft.scvmm/actions) [![Codecov](https://img.shields.io/codecov/c/github/ansible-collections/microsoft.scvmm)](https://codecov.io/gh/ansible-collections/microsoft.scvmm)
+[![CI](https://github.com/ansible-collections/microsoft.scvmm/actions/workflows/ansible-test.yml/badge.svg?event=push)](https://github.com/ansible-collections/microsoft.scvmm/actions/workflows/ansible-test.yml)
 
 This collection provides comprehensive automation capabilities for Microsoft System Center Virtual Machine Manager (SCVMM) 2022 environments. It enables users to manage virtual machines, networking, storage, clouds, templates, profiles, and services through Ansible playbooks.
 
