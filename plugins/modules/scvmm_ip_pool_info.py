@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_ip_pool_info
+version_added: "1.0.0"
 short_description: Query static IP address pools in SCVMM
 description:
   - Retrieve information about static IP address pools in SCVMM.

@@ -8,6 +8,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm
+version_added: "1.0.0"
 short_description: Manage SCVMM virtual machines
 description:
   - Create, update, or delete virtual machines in System Center Virtual Machine Manager (SCVMM).

@@ -6,6 +6,7 @@
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_checkpoint
+version_added: "1.0.0"
 short_description: Manage VM checkpoints in System Center Virtual Machine Manager
 description:
   - Create, remove, or revert VM checkpoints (snapshots) in SCVMM.

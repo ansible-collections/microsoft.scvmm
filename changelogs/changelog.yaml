@@ -1,0 +1,267 @@
+---
+ancestor: null
+releases:
+  1.0.0:
+    changes:
+      minor_changes:
+        - scvmm_vm - Manage the creation, update, and removal of Virtual Machines
+          on SCVMM 2022.
+    fragments:
+      - scvmm_vm.yaml
+    modules:
+      - description: Manage application profiles in System Center Virtual Machine
+          Manager.
+        name: scvmm_application_profile
+        namespace: ''
+      - description: Query application profiles in System Center Virtual Machine Manager.
+        name: scvmm_application_profile_info
+        namespace: ''
+      - description: Manage capability profiles in System Center Virtual Machine Manager.
+        name: scvmm_capability_profile
+        namespace: ''
+      - description: Query capability profiles in System Center Virtual Machine Manager.
+        name: scvmm_capability_profile_info
+        namespace: ''
+      - description: Manage private clouds in System Center Virtual Machine Manager.
+        name: scvmm_cloud
+        namespace: ''
+      - description: Manage cloud capacity limits in System Center Virtual Machine
+          Manager.
+        name: scvmm_cloud_capacity
+        namespace: ''
+      - description: Query cloud capacity information in System Center Virtual Machine
+          Manager.
+        name: scvmm_cloud_capacity_info
+        namespace: ''
+      - description: Query private cloud information in System Center Virtual Machine
+          Manager.
+        name: scvmm_cloud_info
+        namespace: ''
+      - description: Manage guest OS profiles in System Center Virtual Machine Manager.
+        name: scvmm_guest_os_profile
+        namespace: ''
+      - description: Query guest OS profiles in System Center Virtual Machine Manager.
+        name: scvmm_guest_os_profile_info
+        namespace: ''
+      - description: Manage hardware profiles in System Center Virtual Machine Manager.
+        name: scvmm_hardware_profile
+        namespace: ''
+      - description: Query hardware profiles in System Center Virtual Machine Manager.
+        name: scvmm_hardware_profile_info
+        namespace: ''
+      - description: Manage Hyper-V hosts in System Center Virtual Machine Manager.
+        name: scvmm_host
+        namespace: ''
+      - description: Manage Hyper-V failover clusters in System Center Virtual Machine
+          Manager.
+        name: scvmm_host_cluster
+        namespace: ''
+      - description: Query host cluster information in System Center Virtual Machine
+          Manager.
+        name: scvmm_host_cluster_info
+        namespace: ''
+      - description: Manage host groups in System Center Virtual Machine Manager.
+        name: scvmm_host_group
+        namespace: ''
+      - description: Query host groups in System Center Virtual Machine Manager.
+        name: scvmm_host_group_info
+        namespace: ''
+      - description: Query Hyper-V host information in System Center Virtual Machine
+          Manager.
+        name: scvmm_host_info
+        namespace: ''
+      - description: Manage host network adapter configuration in System Center Virtual
+          Machine Manager.
+        name: scvmm_host_network_adapter
+        namespace: ''
+      - description: Query host network adapter information in System Center Virtual
+          Machine Manager.
+        name: scvmm_host_network_adapter_info
+        namespace: ''
+      - description: Query host placement ratings in System Center Virtual Machine
+          Manager.
+        name: scvmm_host_rating_info
+        namespace: ''
+      - description: Manage static IP address pools in SCVMM.
+        name: scvmm_ip_pool
+        namespace: ''
+      - description: Query static IP address pools in SCVMM.
+        name: scvmm_ip_pool_info
+        namespace: ''
+      - description: Manage load balancers in SCVMM.
+        name: scvmm_load_balancer
+        namespace: ''
+      - description: Query load balancers in SCVMM.
+        name: scvmm_load_balancer_info
+        namespace: ''
+      - description: Manage logical networks in System Center Virtual Machine Manager.
+        name: scvmm_logical_network
+        namespace: ''
+      - description: Manage logical network definitions (network sites) in SCVMM.
+        name: scvmm_logical_network_definition
+        namespace: ''
+      - description: Query logical network definitions in SCVMM.
+        name: scvmm_logical_network_definition_info
+        namespace: ''
+      - description: Query logical networks in System Center Virtual Machine Manager.
+        name: scvmm_logical_network_info
+        namespace: ''
+      - description: Manage logical switches in SCVMM.
+        name: scvmm_logical_switch
+        namespace: ''
+      - description: Query logical switches in SCVMM.
+        name: scvmm_logical_switch_info
+        namespace: ''
+      - description: Manage MAC address pools in SCVMM.
+        name: scvmm_mac_address_pool
+        namespace: ''
+      - description: Query MAC address pools in SCVMM.
+        name: scvmm_mac_address_pool_info
+        namespace: ''
+      - description: Manage virtual network adapters on VMs in SCVMM.
+        name: scvmm_network_adapter
+        namespace: ''
+      - description: Query virtual network adapters on VMs in SCVMM.
+        name: scvmm_network_adapter_info
+        namespace: ''
+      - description: Manage port classifications in System Center Virtual Machine
+          Manager.
+        name: scvmm_port_classification
+        namespace: ''
+      - description: Query port classifications in System Center Virtual Machine Manager.
+        name: scvmm_port_classification_info
+        namespace: ''
+      - description: Manage Run As accounts in System Center Virtual Machine Manager.
+        name: scvmm_run_as_account
+        namespace: ''
+      - description: Query Run As accounts in System Center Virtual Machine Manager.
+        name: scvmm_run_as_account_info
+        namespace: ''
+      - description: Manage services in System Center Virtual Machine Manager.
+        name: scvmm_service
+        namespace: ''
+      - description: Get service information from System Center Virtual Machine Manager.
+        name: scvmm_service_info
+        namespace: ''
+      - description: Manage service templates in System Center Virtual Machine Manager.
+        name: scvmm_service_template
+        namespace: ''
+      - description: Get service template information from System Center Virtual Machine
+          Manager.
+        name: scvmm_service_template_info
+        namespace: ''
+      - description: Manage SQL profiles in System Center Virtual Machine Manager.
+        name: scvmm_sql_profile
+        namespace: ''
+      - description: Get SQL profile information from System Center Virtual Machine
+          Manager.
+        name: scvmm_sql_profile_info
+        namespace: ''
+      - description: Manage storage classifications in System Center Virtual Machine
+          Manager.
+        name: scvmm_storage_classification
+        namespace: ''
+      - description: Query storage classifications in System Center Virtual Machine
+          Manager.
+        name: scvmm_storage_classification_info
+        namespace: ''
+      - description: Query storage file shares in System Center Virtual Machine Manager.
+        name: scvmm_storage_file_share_info
+        namespace: ''
+      - description: Manage storage pools in System Center Virtual Machine Manager.
+        name: scvmm_storage_pool
+        namespace: ''
+      - description: Query storage pools in System Center Virtual Machine Manager.
+        name: scvmm_storage_pool_info
+        namespace: ''
+      - description: Manage storage providers in System Center Virtual Machine Manager.
+        name: scvmm_storage_provider
+        namespace: ''
+      - description: Query storage providers in System Center Virtual Machine Manager.
+        name: scvmm_storage_provider_info
+        namespace: ''
+      - description: Manage VM templates in System Center Virtual Machine Manager.
+        name: scvmm_template
+        namespace: ''
+      - description: Query VM templates in System Center Virtual Machine Manager.
+        name: scvmm_template_info
+        namespace: ''
+      - description: Manage native uplink port profiles in SCVMM.
+        name: scvmm_uplink_port_profile
+        namespace: ''
+      - description: Query native uplink port profiles in SCVMM.
+        name: scvmm_uplink_port_profile_info
+        namespace: ''
+      - description: Manage user roles in System Center Virtual Machine Manager.
+        name: scvmm_user_role
+        namespace: ''
+      - description: Query user roles in System Center Virtual Machine Manager.
+        name: scvmm_user_role_info
+        namespace: ''
+      - description: Manage user role quotas in System Center Virtual Machine Manager.
+        name: scvmm_user_role_quota
+        namespace: ''
+      - description: Query user role quotas in System Center Virtual Machine Manager.
+        name: scvmm_user_role_quota_info
+        namespace: ''
+      - description: Manage virtual hard disks in System Center Virtual Machine Manager.
+        name: scvmm_virtual_hard_disk
+        namespace: ''
+      - description: Query virtual hard disks in System Center Virtual Machine Manager.
+        name: scvmm_virtual_hard_disk_info
+        namespace: ''
+      - description: Manage SCVMM virtual machines.
+        name: scvmm_vm
+        namespace: ''
+      - description: Manage VM checkpoints in System Center Virtual Machine Manager.
+        name: scvmm_vm_checkpoint
+        namespace: ''
+      - description: Retrieve checkpoint information for SCVMM virtual machines.
+        name: scvmm_vm_checkpoint_info
+        namespace: ''
+      - description: Clone a virtual machine in System Center Virtual Machine Manager.
+        name: scvmm_vm_clone
+        namespace: ''
+      - description: Manage virtual disk drives on SCVMM virtual machines.
+        name: scvmm_vm_disk
+        namespace: ''
+      - description: Query virtual disk drives on VMs in SCVMM.
+        name: scvmm_vm_disk_info
+        namespace: ''
+      - description: Manage virtual DVD drives on SCVMM virtual machines.
+        name: scvmm_vm_dvd_drive
+        namespace: ''
+      - description: Retrieve DVD drive information for SCVMM virtual machines.
+        name: scvmm_vm_dvd_drive_info
+        namespace: ''
+      - description: Retrieve information about SCVMM virtual machines.
+        name: scvmm_vm_info
+        namespace: ''
+      - description: Live migrate a VM between Hyper-V hosts in SCVMM.
+        name: scvmm_vm_migrate
+        namespace: ''
+      - description: Manage VM networks in System Center Virtual Machine Manager.
+        name: scvmm_vm_network
+        namespace: ''
+      - description: Query VM networks in System Center Virtual Machine Manager.
+        name: scvmm_vm_network_info
+        namespace: ''
+      - description: Configure virtual network adapter settings on VMs in SCVMM.
+        name: scvmm_vm_nic
+        namespace: ''
+      - description: Manage virtual SCSI adapters on SCVMM virtual machines.
+        name: scvmm_vm_scsi_adapter
+        namespace: ''
+      - description: Retrieve SCSI adapter information for SCVMM virtual machines.
+        name: scvmm_vm_scsi_adapter_info
+        namespace: ''
+      - description: Manage SCVMM virtual machine power state.
+        name: scvmm_vm_state
+        namespace: ''
+      - description: Manage VM subnets in SCVMM.
+        name: scvmm_vm_subnet
+        namespace: ''
+      - description: Query VM subnets in SCVMM.
+        name: scvmm_vm_subnet_info
+        namespace: ''
+    release_date: '2026-08-02'

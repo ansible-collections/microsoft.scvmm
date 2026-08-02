@@ -6,6 +6,7 @@
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_migrate
+version_added: "1.0.0"
 short_description: Live migrate a VM between Hyper-V hosts in SCVMM
 description:
   - Live migrates a virtual machine from its current Hyper-V host to a specified destination host.

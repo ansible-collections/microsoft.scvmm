@@ -9,6 +9,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_dvd_drive_info
+version_added: "1.0.0"
 short_description: Retrieve DVD drive information for SCVMM virtual machines
 description:
   - Query virtual DVD drive information from SCVMM virtual machines.

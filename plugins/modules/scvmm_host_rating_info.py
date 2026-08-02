@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_host_rating_info
+version_added: "1.0.0"
 short_description: Query host placement ratings in System Center Virtual Machine Manager
 description:
   - Retrieve host placement ratings for a virtual machine in SCVMM.

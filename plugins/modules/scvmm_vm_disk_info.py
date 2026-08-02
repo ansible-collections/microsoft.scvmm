@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_disk_info
+version_added: "1.0.0"
 short_description: Query virtual disk drives on VMs in SCVMM
 description:
   - Retrieve information about virtual disk drives attached to a VM.

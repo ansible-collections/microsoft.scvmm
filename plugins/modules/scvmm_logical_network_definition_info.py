@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_logical_network_definition_info
+version_added: "1.0.0"
 short_description: Query logical network definitions in SCVMM
 description:
   - Retrieve information about logical network definitions (network sites) in SCVMM.

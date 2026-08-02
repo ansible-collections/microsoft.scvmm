@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_template
+version_added: "1.0.0"
 short_description: Manage VM templates in System Center Virtual Machine Manager
 description:
   - Create, update, and remove VM templates in SCVMM.

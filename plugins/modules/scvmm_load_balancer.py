@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_load_balancer
+version_added: "1.0.0"
 short_description: Manage load balancers in SCVMM
 description:
   - Register, update, or remove load balancers in System Center Virtual Machine Manager.

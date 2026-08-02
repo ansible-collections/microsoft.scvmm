@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_network_adapter_info
+version_added: "1.0.0"
 short_description: Query virtual network adapters on VMs in SCVMM
 description:
   - Retrieve information about virtual network adapters attached to a VM.

@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_logical_switch
+version_added: "1.0.0"
 short_description: Manage logical switches in SCVMM
 description:
   - Create, update, or remove logical switches in System Center Virtual Machine Manager.

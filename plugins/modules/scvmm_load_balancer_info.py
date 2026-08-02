@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_load_balancer_info
+version_added: "1.0.0"
 short_description: Query load balancers in SCVMM
 description:
   - Retrieve information about load balancers registered in SCVMM.

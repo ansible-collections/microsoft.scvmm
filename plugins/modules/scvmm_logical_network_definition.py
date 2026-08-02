@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_logical_network_definition
+version_added: "1.0.0"
 short_description: Manage logical network definitions (network sites) in SCVMM
 description:
   - Create, update, or remove logical network definitions in System Center Virtual Machine Manager.

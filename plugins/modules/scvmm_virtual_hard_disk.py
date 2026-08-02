@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_virtual_hard_disk
+version_added: "1.0.0"
 short_description: Manage virtual hard disks in System Center Virtual Machine Manager
 description:
   - Update properties or remove virtual hard disks in the SCVMM library.

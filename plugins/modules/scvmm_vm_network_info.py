@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_network_info
+version_added: "1.0.0"
 short_description: Query VM networks in System Center Virtual Machine Manager
 description:
   - Retrieve information about VM networks in SCVMM.

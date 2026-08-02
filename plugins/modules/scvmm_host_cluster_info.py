@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_host_cluster_info
+version_added: "1.0.0"
 short_description: Query host cluster information in System Center Virtual Machine Manager
 description:
   - Retrieve information about Hyper-V host clusters managed by SCVMM.

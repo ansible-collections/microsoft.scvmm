@@ -9,6 +9,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_scsi_adapter_info
+version_added: "1.0.0"
 short_description: Retrieve SCSI adapter information for SCVMM virtual machines
 description:
   - Query virtual SCSI adapter information from SCVMM virtual machines.

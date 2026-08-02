@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_subnet
+version_added: "1.0.0"
 short_description: Manage VM subnets in SCVMM
 description:
   - Create, update, or remove VM subnets in System Center Virtual Machine Manager.

@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_capability_profile_info
+version_added: "1.0.0"
 short_description: Query capability profiles in System Center Virtual Machine Manager
 description:
   - Query capability profiles from SCVMM.

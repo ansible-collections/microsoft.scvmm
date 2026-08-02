@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_template_info
+version_added: "1.0.0"
 short_description: Query VM templates in System Center Virtual Machine Manager
 description:
   - Retrieve information about VM templates in SCVMM.

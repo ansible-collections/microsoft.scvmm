@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_logical_switch_info
+version_added: "1.0.0"
 short_description: Query logical switches in SCVMM
 description:
   - Retrieve information about logical switches in SCVMM.

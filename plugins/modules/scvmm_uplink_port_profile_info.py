@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_uplink_port_profile_info
+version_added: "1.0.0"
 short_description: Query native uplink port profiles in SCVMM
 description:
   - Retrieve information about native uplink port profiles in SCVMM.

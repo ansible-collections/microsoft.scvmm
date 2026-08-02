@@ -6,6 +6,7 @@
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_state
+version_added: "1.0.0"
 short_description: Manage SCVMM virtual machine power state
 description:
   - Manages the power state of virtual machines in System Center Virtual Machine Manager (SCVMM).

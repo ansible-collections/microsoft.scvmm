@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_host_network_adapter
+version_added: "1.0.0"
 short_description: Manage host network adapter configuration in System Center Virtual Machine Manager
 description:
   - Configure host network adapter settings in SCVMM.

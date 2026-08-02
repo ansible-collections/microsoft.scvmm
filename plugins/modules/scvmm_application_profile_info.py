@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_application_profile_info
+version_added: "1.0.0"
 short_description: Query application profiles in System Center Virtual Machine Manager
 description:
   - Query application profiles from SCVMM.

@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_host_network_adapter_info
+version_added: "1.0.0"
 short_description: Query host network adapter information in System Center Virtual Machine Manager
 description:
   - Retrieve information about network adapters on Hyper-V hosts managed by SCVMM.

@@ -7,6 +7,7 @@ __metaclass__ = type
 DOCUMENTATION = r'''
 ---
 module: scvmm_vm_subnet_info
+version_added: "1.0.0"
 short_description: Query VM subnets in SCVMM
 description:
   - Retrieve information about VM subnets in SCVMM.
