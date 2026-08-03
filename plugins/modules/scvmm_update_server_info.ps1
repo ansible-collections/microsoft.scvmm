@@ -1,0 +1,51 @@
+#!powershell
+# Copyright (c) 2026, Ansible Cloud Team (@ansible)
+# GNU General Public License v3.0+ (see COPYING or https://www.gnu.org/licenses/gpl-3.0.txt)
+
+#AnsibleRequires -CSharpUtil Ansible.Basic
+#AnsibleRequires -PowerShell ansible_collections.microsoft.scvmm.plugins.module_utils.scvmm
+
+$spec = @{
+    options = @{
+        computer_name = @{ type = 'str' }
+        vmm_server = @{ type = 'str' }
+    }
+    supports_check_mode = $true
+}
+
+$module = [Ansible.Basic.AnsibleModule]::Create($args, $spec)
+
+$module.Result.changed = $false
+
+$vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $module.Params.vmm_server
+
+$propertyMap = @(
+    @{ Param = "id"; Property = "ID"; Type = "id" }
+    @{ Param = "name"; Property = "Name"; Type = "string" }
+    @{ Param = "fqdn"; Property = "FQDN"; Type = "string" }
+    @{ Param = "port"; Property = "Port"; Type = "int" }
+    @{ Param = "is_connection_secure"; Property = "IsConnectionSecure"; Type = "bool" }
+    @{ Param = "server_state"; Property = "ServerState"; Type = "enum" }
+)
+
+try {
+    if ($module.Params.computer_name) {
+        $servers = @(Get-SCUpdateServer -VMMServer $vmmConnection -ComputerName $module.Params.computer_name -ErrorAction Stop)
+    }
+    else {
+        $servers = @(Get-SCUpdateServer -VMMServer $vmmConnection -ErrorAction Stop)
+    }
+}
+catch {
+    $servers = @()
+}
+
+$module.Result.update_servers = @($servers | ForEach-Object {
+        $result = Get-SCVMMResultFromMap -PropertyMap $propertyMap -CurrentObject $_
+        $result['update_categories'] = @($_.UpdateCategories | ForEach-Object { $_.Name })
+        $result['update_classifications'] = @($_.UpdateClassifications | ForEach-Object { $_.Name })
+        $result['update_languages'] = @($_.UpdateLanguages | ForEach-Object { $_.Name })
+        $result
+    })
+
+$module.ExitJson()
