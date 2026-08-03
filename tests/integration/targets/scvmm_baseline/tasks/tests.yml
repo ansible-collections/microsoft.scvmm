@@ -1,0 +1,352 @@
+---
+# ── Create baseline in check mode ──
+- name: Create baseline in check mode
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    description: "{{ test_baseline_description }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: create_check
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - create_check is changed
+
+- name: Verify baseline not actually created in check mode
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert baseline was not created
+  ansible.builtin.assert:
+    that:
+      - after_check_create.baselines | length == 0
+
+# ── Create baseline ──
+- name: Create baseline
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    description: "{{ test_baseline_description }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert baseline was created with all fields
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.baseline is defined
+      - create_result.baseline.id is not none
+      - create_result.baseline.name == test_baseline_name
+      - create_result.baseline.description == test_baseline_description
+      - create_result.baseline.updates is defined
+      - create_result.baseline.updates | length == 0
+      - create_result.baseline.assignment_scopes is defined
+      - create_result.baseline.assignment_scopes | length == 0
+
+# ── Verify creation with info module ──
+- name: Verify baseline exists via info module
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created baseline
+  ansible.builtin.assert:
+    that:
+      - verify_create.baselines | length == 1
+      - verify_create.baselines[0].name == test_baseline_name
+      - verify_create.baselines[0].id is defined
+      - verify_create.baselines[0].description == test_baseline_description
+      - verify_create.baselines[0].updates is defined
+      - verify_create.baselines[0].assignment_scopes is defined
+
+# ── Info: query all ──
+- name: Get all baselines
+  microsoft.scvmm.scvmm_baseline_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_baselines
+
+- name: Assert test baseline appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_baselines.baselines | length > 0
+      - test_baseline_name in (all_baselines.baselines | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Get non-existent baseline
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "NonExistent_Baseline_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.baselines | length == 0
+
+# ── Idempotency ──
+- name: Create same baseline again (idempotency)
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    description: "{{ test_baseline_description }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update baseline description
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.baselines[0].description == "Updated test description"
+
+# ── Update description idempotency ──
+- name: Set same description again (idempotency)
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: desc_idempotent
+
+- name: Assert no change on description idempotency
+  ansible.builtin.assert:
+    that:
+      - desc_idempotent is not changed
+
+# ── Updates: error for non-existent update ──
+- name: Add non-existent update to baseline
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    updates:
+      - "NonExistent_Update_{{ 99999 | random }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_error
+  ignore_errors: true
+
+- name: Assert error for non-existent update
+  ansible.builtin.assert:
+    that:
+      - update_error is failed
+      - "'not found' in update_error.msg or 'Failed to find' in update_error.msg"
+
+# ── Add assignment scope: host_group ──
+- name: Add host_group assignment scope
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    assignment_scopes:
+      - name: "{{ test_host_group_name }}"
+        type: host_group
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: add_host_group_scope
+
+- name: Assert host_group scope was added
+  ansible.builtin.assert:
+    that:
+      - add_host_group_scope is changed
+      - add_host_group_scope.baseline.assignment_scopes | length >= 1
+      - test_host_group_name in add_host_group_scope.baseline.assignment_scopes
+
+# ── Verify scope with info module ──
+- name: Verify host_group scope via info module
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_host_group_scope
+
+- name: Assert info module shows the host_group scope
+  ansible.builtin.assert:
+    that:
+      - verify_host_group_scope.baselines[0].assignment_scopes | length >= 1
+      - test_host_group_name in verify_host_group_scope.baselines[0].assignment_scopes
+
+# ── Scope idempotency ──
+- name: Add same host_group scope again (idempotency)
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    assignment_scopes:
+      - name: "{{ test_host_group_name }}"
+        type: host_group
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: scope_idempotent
+
+- name: Assert no change on scope idempotency
+  ansible.builtin.assert:
+    that:
+      - scope_idempotent is not changed
+
+# ── Replace scope: switch from host_group to managed_computer ──
+- name: Replace scope with managed_computer type
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    assignment_scopes:
+      - name: "{{ test_managed_computer }}"
+        type: managed_computer
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: replace_scope
+
+- name: Assert scope was replaced
+  ansible.builtin.assert:
+    that:
+      - replace_scope is changed
+      - replace_scope.baseline.assignment_scopes | length >= 1
+
+# ── Verify scope replacement via info module ──
+- name: Verify managed_computer scope via info module
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_replaced_scope
+
+- name: Assert old scope removed and new scope present
+  ansible.builtin.assert:
+    that:
+      - verify_replaced_scope.baselines[0].assignment_scopes | length >= 1
+
+# ── Remove all scopes (empty list) ──
+- name: Remove all assignment scopes
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    assignment_scopes: []
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: remove_scopes
+
+- name: Assert scopes were removed
+  ansible.builtin.assert:
+    that:
+      - remove_scopes is changed
+      - remove_scopes.baseline.assignment_scopes | length == 0
+
+# ── Verify empty scopes via info module ──
+- name: Verify scopes removed via info module
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_empty_scopes
+
+- name: Assert info module shows no scopes
+  ansible.builtin.assert:
+    that:
+      - verify_empty_scopes.baselines[0].assignment_scopes | length == 0
+
+# ── Check mode update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode.baselines[0].description == "Updated test description"
+
+# ── Check mode delete ──
+- name: Delete baseline in check mode
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: delete_check
+
+- name: Assert check mode reports change for delete
+  ansible.builtin.assert:
+    that:
+      - delete_check is changed
+
+- name: Verify baseline still exists after check mode delete
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_delete
+
+- name: Assert baseline still present
+  ansible.builtin.assert:
+    that:
+      - after_check_delete.baselines | length == 1
+
+# ── Delete baseline ──
+- name: Delete baseline
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert baseline was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify baseline is gone via info module
+  microsoft.scvmm.scvmm_baseline_info:
+    name: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted baseline
+  ansible.builtin.assert:
+    that:
+      - verify_delete.baselines | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted baseline (idempotency)
+  microsoft.scvmm.scvmm_baseline:
+    name: "{{ test_baseline_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed

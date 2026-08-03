@@ -1,0 +1,6 @@
+---
+scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_wsus_server: WIN-5UL8TNLBCNF.scvmm.local
+test_wsus_port: 8530
+test_run_as_account: VMM Host RunAs
+test_start_sync: false

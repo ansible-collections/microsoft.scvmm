@@ -1,0 +1,398 @@
+---
+# ── Create update server in check mode ──
+- name: Add update server in check mode
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    tcp_port: "{{ test_wsus_port }}"
+    credential: "{{ test_run_as_account }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: create_check
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - create_check is changed
+
+- name: Verify server not actually created in check mode
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "{{ test_wsus_server }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert server was not created
+  ansible.builtin.assert:
+    that:
+      - after_check_create.update_servers | length == 0
+
+# ── Create update server ──
+- name: Add update server
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    tcp_port: "{{ test_wsus_port }}"
+    credential: "{{ test_run_as_account }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert update server was added with all fields
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.update_server is defined
+      - create_result.update_server.id is not none
+      - create_result.update_server.name is not none
+      - create_result.update_server.port == test_wsus_port
+      - create_result.update_server.update_categories is defined
+      - create_result.update_server.update_classifications is defined
+      - create_result.update_server.update_languages is defined
+
+# ── Verify creation with info module ──
+- name: Verify update server exists via info module
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "{{ test_wsus_server }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created server
+  ansible.builtin.assert:
+    that:
+      - verify_create.update_servers | length >= 1
+      - verify_create.update_servers[0].id is not none
+      - verify_create.update_servers[0].port == test_wsus_port
+      - verify_create.update_servers[0].update_categories is defined
+      - verify_create.update_servers[0].update_classifications is defined
+      - verify_create.update_servers[0].update_languages is defined
+
+# ── Info: query all ──
+- name: Get all update servers
+  microsoft.scvmm.scvmm_update_server_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_servers
+
+- name: Assert test server appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_servers.update_servers | length > 0
+
+# ── Info: query non-existent ──
+- name: Get non-existent update server
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "nonexistent.wsus.{{ 99999 | random }}.local"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.update_servers | length == 0
+
+# ── Update: set single classification (force change from defaults) ──
+- name: Set single classification to force change
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_classifications:
+      - Updates
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_single_classification
+
+- name: Assert single classification was applied
+  ansible.builtin.assert:
+    that:
+      - set_single_classification.update_server.update_classifications | length == 1
+      - "'Updates' in set_single_classification.update_server.update_classifications"
+
+# ── Update: set two classifications ──
+- name: Configure update classifications
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_classifications:
+      - Security Updates
+      - Critical Updates
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_classifications
+
+- name: Assert classifications were changed
+  ansible.builtin.assert:
+    that:
+      - update_classifications is changed
+      - update_classifications.update_server.update_classifications | length == 2
+
+# ── Update classifications idempotency ──
+- name: Configure same update classifications again (idempotency)
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_classifications:
+      - Security Updates
+      - Critical Updates
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: classifications_idempotent
+
+- name: Assert no change on idempotent classifications update
+  ansible.builtin.assert:
+    that:
+      - classifications_idempotent is not changed
+
+# ── Update: set languages ──
+- name: Configure update languages
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_languages:
+      - en
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: update_languages
+
+# ── Update languages idempotency ──
+- name: Configure same update languages again (idempotency)
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_languages:
+      - en
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: languages_idempotent
+
+- name: Assert no change on idempotent languages update
+  ansible.builtin.assert:
+    that:
+      - languages_idempotent is not changed
+
+# ── Update: set categories ──
+- name: Discover current update categories
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "{{ test_wsus_server }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: discover_cats
+
+- name: Set fact for test category
+  ansible.builtin.set_fact:
+    test_category: "{{ discover_cats.update_servers[0].update_categories[0] }}"
+  when: discover_cats.update_servers[0].update_categories | length > 0
+
+- name: Set single update category
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_categories:
+      - "{{ test_category }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_category
+  when: test_category is defined
+
+- name: Assert category was set
+  ansible.builtin.assert:
+    that:
+      - set_category.update_server.update_categories | length == 1
+      - test_category in set_category.update_server.update_categories
+  when: set_category is not skipped
+
+- name: Set same category again (idempotency)
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_categories:
+      - "{{ test_category }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: category_idempotent
+  when: test_category is defined
+
+- name: Assert no change on category idempotency
+  ansible.builtin.assert:
+    that:
+      - category_idempotent is not changed
+  when: category_idempotent is not skipped
+
+# ── Verify all list settings via info module ──
+- name: Verify all update settings via info module
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "{{ test_wsus_server }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all_settings
+
+- name: Assert all list settings are correct
+  ansible.builtin.assert:
+    that:
+      - verify_all_settings.update_servers[0].update_classifications | length == 2
+      - "'Security Updates' in verify_all_settings.update_servers[0].update_classifications"
+      - "'Critical Updates' in verify_all_settings.update_servers[0].update_classifications"
+
+# ── Update: enable proxy ──
+- name: Enable proxy for WSUS sync
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    enable_proxy: true
+    proxy_server_name: proxy.test.local
+    proxy_server_port: 8080
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_proxy
+
+- name: Assert proxy was enabled
+  ansible.builtin.assert:
+    that:
+      - enable_proxy is changed
+
+# ── Update: disable proxy ──
+- name: Disable proxy for WSUS sync
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    enable_proxy: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disable_proxy
+
+- name: Assert proxy was disabled
+  ansible.builtin.assert:
+    that:
+      - disable_proxy is changed
+
+# ── Update classifications in check mode ──
+- name: Update classifications in check mode
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    update_classifications:
+      - Security Updates
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: update_check
+
+- name: Assert check mode reports change for update
+  ansible.builtin.assert:
+    that:
+      - update_check is changed
+
+- name: Verify classifications unchanged after check mode
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "{{ test_wsus_server }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_update
+
+- name: Assert classifications still have both values
+  ansible.builtin.assert:
+    that:
+      - verify_check_update.update_servers[0].update_classifications | length == 2
+
+# ── Check mode delete ──
+- name: Remove update server in check mode
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    credential: "{{ test_run_as_account }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: delete_check
+
+- name: Assert check mode reports change for delete
+  ansible.builtin.assert:
+    that:
+      - delete_check is changed
+
+- name: Verify server still exists after check mode delete
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "{{ test_wsus_server }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_delete
+
+- name: Assert server still present
+  ansible.builtin.assert:
+    that:
+      - after_check_delete.update_servers | length >= 1
+
+# ── Delete update server ──
+- name: Remove update server
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    credential: "{{ test_run_as_account }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert update server was removed
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify update server is gone via info module
+  microsoft.scvmm.scvmm_update_server_info:
+    computer_name: "{{ test_wsus_server }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted server
+  ansible.builtin.assert:
+    that:
+      - verify_delete.update_servers | length == 0
+
+# ── Absent idempotency ──
+- name: Remove already-deleted update server (idempotency)
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    credential: "{{ test_run_as_account }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed
+
+# ── Create with start_sync (disabled by default — triggers real WSUS catalog sync) ──
+- name: Add update server with start_sync
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    tcp_port: "{{ test_wsus_port }}"
+    credential: "{{ test_run_as_account }}"
+    start_sync: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_sync
+  when: test_start_sync | bool
+
+- name: Assert server created with sync
+  ansible.builtin.assert:
+    that:
+      - create_sync is changed
+      - create_sync.update_server.id is not none
+  when: create_sync is not skipped
+
+- name: Clean up after start_sync test
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    credential: "{{ test_run_as_account }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  when: create_sync is not skipped
+
+# ── Create with use_ssl (environment-dependent) ──
+- name: Add update server with SSL
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    tcp_port: 8531
+    credential: "{{ test_run_as_account }}"
+    use_ssl: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_ssl
+  ignore_errors: true
+
+- name: Assert SSL server was created (if environment supports it)
+  ansible.builtin.assert:
+    that:
+      - create_ssl.update_server.is_connection_secure
+  when: create_ssl is not failed
+
+- name: Clean up SSL server
+  microsoft.scvmm.scvmm_update_server:
+    computer_name: "{{ test_wsus_server }}"
+    credential: "{{ test_run_as_account }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  when: create_ssl is not failed

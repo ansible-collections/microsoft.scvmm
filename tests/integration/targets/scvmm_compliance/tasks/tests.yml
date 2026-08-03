@@ -1,0 +1,100 @@
+---
+# ── Compliance scan: check mode ──
+- name: Start compliance scan in check mode
+  microsoft.scvmm.scvmm_compliance_scan:
+    vmm_managed_computer: "{{ test_managed_computer }}"
+    baseline: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: scan_check
+
+- name: Assert check mode reports change but scan not started
+  ansible.builtin.assert:
+    that:
+      - scan_check is changed
+      - not scan_check.scan_started
+
+# ── Compliance scan: empty baseline fails gracefully ──
+- name: Start compliance scan against baseline with no updates
+  microsoft.scvmm.scvmm_compliance_scan:
+    vmm_managed_computer: "{{ test_managed_computer }}"
+    baseline: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: scan_empty
+  ignore_errors: true
+
+- name: Assert scan failed because baseline has no updates
+  ansible.builtin.assert:
+    that:
+      - scan_empty is failed
+      - "'No updates' in scan_empty.msg or 'compliance scan' in scan_empty.msg"
+
+# ── Compliance info: query status for baseline (no scan completed) ──
+- name: Query compliance status for specific baseline
+  microsoft.scvmm.scvmm_compliance_info:
+    vmm_managed_computer: "{{ test_managed_computer }}"
+    baseline: "{{ test_baseline_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_baseline
+
+- name: Assert compliance info returns valid response
+  ansible.builtin.assert:
+    that:
+      - info_baseline.compliance_statuses is defined
+      - info_baseline is not changed
+
+# ── Compliance info: query all statuses ──
+- name: Query all compliance statuses for managed computer
+  microsoft.scvmm.scvmm_compliance_info:
+    vmm_managed_computer: "{{ test_managed_computer }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: info_all
+
+- name: Assert compliance info returns valid response for all query
+  ansible.builtin.assert:
+    that:
+      - info_all.compliance_statuses is defined
+      - info_all is not changed
+
+# ── Error: scan non-existent computer ──
+- name: Start scan on non-existent computer
+  microsoft.scvmm.scvmm_compliance_scan:
+    vmm_managed_computer: nonexistent.example.com
+    vmm_server: "{{ scvmm_server }}"
+  register: scan_error
+  ignore_errors: true
+
+- name: Assert scan failed with proper error
+  ansible.builtin.assert:
+    that:
+      - scan_error is failed
+      - "'not found' in scan_error.msg or 'Failed to query' in scan_error.msg"
+
+# ── Error: scan non-existent baseline ──
+- name: Start scan with non-existent baseline
+  microsoft.scvmm.scvmm_compliance_scan:
+    vmm_managed_computer: "{{ test_managed_computer }}"
+    baseline: "NonExistent_Baseline_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: scan_baseline_error
+  ignore_errors: true
+
+- name: Assert scan failed for non-existent baseline
+  ansible.builtin.assert:
+    that:
+      - scan_baseline_error is failed
+      - "'cannot find' in scan_baseline_error.msg or 'not found' in scan_baseline_error.msg"
+
+# ── Error: info non-existent computer ──
+- name: Query compliance for non-existent computer
+  microsoft.scvmm.scvmm_compliance_info:
+    vmm_managed_computer: nonexistent.example.com
+    vmm_server: "{{ scvmm_server }}"
+  register: info_error
+  ignore_errors: true
+
+- name: Assert info failed with proper error
+  ansible.builtin.assert:
+    that:
+      - info_error is failed
+      - "'not found' in info_error.msg or 'Failed to query' in info_error.msg"
