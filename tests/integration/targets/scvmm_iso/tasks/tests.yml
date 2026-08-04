@@ -1,0 +1,412 @@
+---
+# ── Info: get specific ISO by name ──
+- name: Get ISO by name
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: iso_info
+
+- name: Assert ISO was found with correct properties
+  ansible.builtin.assert:
+    that:
+      - iso_info.isos | length == 1
+      - iso_info.isos[0].name == test_iso_name
+      - iso_info.isos[0].id is defined
+      - iso_info.isos[0].id | length > 0
+      - iso_info.isos[0].share_path is defined
+      - iso_info.isos[0].library_server is defined
+      - iso_info.isos[0].library_server | length > 0
+      - iso_info.isos[0].enabled is defined
+      - iso_info.isos[0].owner is defined
+      - iso_info.isos[0].is_orphaned is defined
+      - iso_info.isos[0].is_orphaned == false
+
+# ── Info: get all ISOs ──
+- name: Get all ISOs
+  microsoft.scvmm.scvmm_iso_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_isos
+
+- name: Assert all ISOs returned includes our test ISO
+  ansible.builtin.assert:
+    that:
+      - all_isos.isos | length >= 1
+      - test_iso_name in (all_isos.isos | map(attribute='name') | list)
+
+# ── Info: non-existent ISO returns empty list ──
+- name: Query non-existent ISO
+  microsoft.scvmm.scvmm_iso_info:
+    name: "NonExistent_{{ 99999 | random }}.iso"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_iso
+
+- name: Assert empty list for non-existent ISO
+  ansible.builtin.assert:
+    that:
+      - no_iso.isos | length == 0
+
+# ── Action: present with no changes (idempotency) ──
+- name: Set ISO with no property changes (idempotency)
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_change
+
+- name: Assert no change when no properties specified
+  ansible.builtin.assert:
+    that:
+      - no_change is not changed
+      - no_change.iso.name == test_iso_name
+
+# ── Action: update description ──
+- name: Update ISO description
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    description: "Ansible test ISO description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_desc
+
+- name: Assert description was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_desc is changed
+      - update_desc.iso.description == "Ansible test ISO description"
+      - update_desc.diff.before is defined
+      - update_desc.diff.after is defined
+      - update_desc.diff.after.description == "Ansible test ISO description"
+
+# ── Action: update description idempotency ──
+- name: Update ISO with same description (idempotency)
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    description: "Ansible test ISO description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: desc_idempotent
+
+- name: Assert no change on description idempotency
+  ansible.builtin.assert:
+    that:
+      - desc_idempotent is not changed
+
+# ── Info: verify description via info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_desc
+
+- name: Assert info module shows updated description
+  ansible.builtin.assert:
+    that:
+      - verify_desc.isos[0].description == "Ansible test ISO description"
+
+# ── Action: update family_name individually ──
+- name: Update ISO family name only
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    family_name: "TestFamily"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_family
+
+- name: Assert family name was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_family is changed
+      - update_family.iso.family_name == "TestFamily"
+      - update_family.diff.after.family_name == "TestFamily"
+
+- name: Update ISO with same family name (idempotency)
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    family_name: "TestFamily"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: family_idempotent
+
+- name: Assert no change on family name idempotency
+  ansible.builtin.assert:
+    that:
+      - family_idempotent is not changed
+
+# ── Action: update release individually ──
+- name: Update ISO release only
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    release: "1.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_release
+
+- name: Assert release was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_release is changed
+      - update_release.iso.release == "1.0"
+      - update_release.diff.after.release == "1.0"
+
+- name: Update ISO with same release (idempotency)
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    release: "1.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: release_idempotent
+
+- name: Assert no change on release idempotency
+  ansible.builtin.assert:
+    that:
+      - release_idempotent is not changed
+
+# ── Info: verify all properties via info module ──
+- name: Verify all properties via info module
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all
+
+- name: Assert all updated properties are correct
+  ansible.builtin.assert:
+    that:
+      - verify_all.isos[0].description == "Ansible test ISO description"
+      - verify_all.isos[0].family_name == "TestFamily"
+      - verify_all.isos[0].release == "1.0"
+
+# ── Action: update multiple properties at once ──
+- name: Update description and release together
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    description: "Updated multi-property"
+    release: "2.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: multi_update
+
+- name: Assert multiple properties updated
+  ansible.builtin.assert:
+    that:
+      - multi_update is changed
+      - multi_update.iso.description == "Updated multi-property"
+      - multi_update.iso.release == "2.0"
+      - multi_update.iso.family_name == "TestFamily"
+
+# ── Action: disable ISO ──
+- name: Disable ISO
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    enabled: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disable_result
+
+- name: Assert ISO was disabled
+  ansible.builtin.assert:
+    that:
+      - disable_result is changed
+      - disable_result.iso.enabled == false
+
+# ── Action: disable idempotency ──
+- name: Disable ISO again (idempotency)
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    enabled: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disable_idempotent
+
+- name: Assert no change on disable idempotency
+  ansible.builtin.assert:
+    that:
+      - disable_idempotent is not changed
+
+# ── Info: verify disabled state ──
+- name: Verify disabled state via info module
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_disabled
+
+- name: Assert info module shows disabled
+  ansible.builtin.assert:
+    that:
+      - verify_disabled.isos[0].enabled == false
+
+# ── Action: re-enable ISO ──
+- name: Re-enable ISO
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    enabled: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_result
+
+- name: Assert ISO was re-enabled
+  ansible.builtin.assert:
+    that:
+      - enable_result is changed
+      - enable_result.iso.enabled == true
+
+# ── Action: re-enable idempotency ──
+- name: Re-enable ISO again (idempotency)
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    enabled: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_idempotent
+
+- name: Assert no change on re-enable idempotency
+  ansible.builtin.assert:
+    that:
+      - enable_idempotent is not changed
+
+# ── Info: verify re-enabled state ──
+- name: Verify re-enabled state via info module
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_enabled
+
+- name: Assert info module shows enabled
+  ansible.builtin.assert:
+    that:
+      - verify_enabled.isos[0].enabled == true
+
+# ── Verify owner is read-only ──
+- name: Verify owner is returned but not updatable
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    owner: "CONTOSO\\ansible_test_nonexistent"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: owner_readonly
+
+- name: Assert owner param is ignored (not in updateMap)
+  ansible.builtin.assert:
+    that:
+      - owner_readonly is not changed
+
+- name: Verify owner is still returned in info results
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: owner_info
+
+- name: Assert owner field is present in info output
+  ansible.builtin.assert:
+    that:
+      - owner_info.isos[0].owner is defined
+
+# ── Action: check mode update ──
+- name: Update ISO in check mode
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description unchanged after check mode
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert description still has previous value
+  ansible.builtin.assert:
+    that:
+      - after_check.isos[0].description == "Updated multi-property"
+
+# ── Action: error for non-existent ISO with state=present ──
+- name: Update non-existent ISO (should fail)
+  microsoft.scvmm.scvmm_iso:
+    name: "NonExistent_{{ 99999 | random }}.iso"
+    description: "This should fail"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: not_found_error
+  ignore_errors: true
+
+- name: Assert error for non-existent ISO
+  ansible.builtin.assert:
+    that:
+      - not_found_error is failed
+      - "'not found' in not_found_error.msg"
+
+# ── Action: check mode delete ──
+- name: Delete ISO in check mode
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode reports change for delete
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify ISO still exists after check mode delete
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_delete
+
+- name: Assert ISO still present
+  ansible.builtin.assert:
+    that:
+      - after_check_delete.isos | length == 1
+
+# ── Action: delete ISO ──
+- name: Remove ISO
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: delete_result
+
+- name: Assert ISO was removed with diff
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_result.diff.before.name == test_iso_name
+      - delete_result.diff.after == {}
+
+# ── Action: verify deletion via info module ──
+- name: Verify ISO removed via info module
+  microsoft.scvmm.scvmm_iso_info:
+    name: "{{ test_iso_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_deleted
+
+- name: Assert ISO no longer exists
+  ansible.builtin.assert:
+    that:
+      - verify_deleted.isos | length == 0
+
+# ── Action: absent idempotency ──
+- name: Remove already-deleted ISO (idempotency)
+  microsoft.scvmm.scvmm_iso:
+    name: "{{ test_iso_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed

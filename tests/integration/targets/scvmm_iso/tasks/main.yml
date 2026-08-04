@@ -1,0 +1,89 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_iso_name: "AnsibleTest_{{ 99999 | random }}.iso"
+
+- name: Get library share path for test ISO placement
+  ansible.windows.win_powershell:
+    script: |
+      param($ServerName)
+      Import-Module VirtualMachineManager
+      $vmmServer = Get-SCVMMServer -ComputerName $ServerName
+      $share = Get-SCLibraryShare -VMMServer $vmmServer | Select-Object -First 1
+      if (-not $share) {
+        throw "No library share found on VMM server"
+      }
+      $Ansible.Result = @{
+        SharePath = $share.Path
+        ShareName = $share.Name
+      }
+    parameters:
+      ServerName: "{{ scvmm_server }}"
+  register: library_share
+
+- name: Create test ISO file on library share
+  ansible.windows.win_powershell:
+    script: |
+      param($SharePath, $IsoName)
+      $isoPath = Join-Path $SharePath $IsoName
+      # Create a minimal file to be discovered as an ISO
+      [System.IO.File]::WriteAllBytes($isoPath, (New-Object byte[] 2048))
+      $Ansible.Result = $isoPath
+    parameters:
+      SharePath: "{{ library_share.result.SharePath }}"
+      IsoName: "{{ test_iso_name }}"
+  register: iso_file_path
+
+- name: Refresh library share to discover the ISO
+  ansible.windows.win_powershell:
+    script: |
+      param($ServerName, $ShareName, $IsoName)
+      Import-Module VirtualMachineManager
+      $vmmServer = Get-SCVMMServer -ComputerName $ServerName
+      $share = Get-SCLibraryShare -VMMServer $vmmServer | Where-Object { $_.Name -eq $ShareName }
+      Read-SCLibraryShare -LibraryShare $share | Out-Null
+      Start-Sleep -Seconds 5
+      $iso = Get-SCISO -VMMServer $vmmServer -Name $IsoName
+      $Ansible.Result = @{
+        Found = ($null -ne $iso)
+        Name = if ($iso) { $iso.Name } else { $null }
+      }
+    parameters:
+      ServerName: "{{ scvmm_server }}"
+      ShareName: "{{ library_share.result.ShareName }}"
+      IsoName: "{{ test_iso_name }}"
+  register: refresh_result
+  retries: 3
+  delay: 10
+  until: refresh_result.result.Found | default(false)
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test ISO from VMM
+      microsoft.scvmm.scvmm_iso:
+        name: "{{ test_iso_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Delete test ISO file from disk
+      ansible.windows.win_file:
+        path: "{{ iso_file_path.result }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Teardown - Refresh library share
+      ansible.windows.win_powershell:
+        script: |
+          param($ServerName, $ShareName)
+          Import-Module VirtualMachineManager
+          $vmmServer = Get-SCVMMServer -ComputerName $ServerName
+          $share = Get-SCLibraryShare -VMMServer $vmmServer | Where-Object { $_.Name -eq $ShareName }
+          if ($share) { Read-SCLibraryShare -LibraryShare $share | Out-Null }
+        parameters:
+          ServerName: "{{ scvmm_server }}"
+          ShareName: "{{ library_share.result.ShareName }}"
+      ignore_errors: true
