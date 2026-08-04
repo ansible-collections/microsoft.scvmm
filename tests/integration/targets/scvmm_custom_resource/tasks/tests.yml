@@ -1,0 +1,425 @@
+---
+# ── Info: get specific custom resource by name ──
+- name: Get custom resource by name
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: cr_info
+
+- name: Assert custom resource was found with correct properties
+  ansible.builtin.assert:
+    that:
+      - cr_info.custom_resources | length == 1
+      - cr_info.custom_resources[0].name == test_cr_name
+      - cr_info.custom_resources[0].id is defined
+      - cr_info.custom_resources[0].id | length > 0
+      - cr_info.custom_resources[0].share_path is defined
+      - cr_info.custom_resources[0].library_server is defined
+      - cr_info.custom_resources[0].library_server | length > 0
+      - cr_info.custom_resources[0].enabled is defined
+      - cr_info.custom_resources[0].owner is defined
+      - cr_info.custom_resources[0].is_orphaned is defined
+      - cr_info.custom_resources[0].is_orphaned == false
+
+# ── Info: get all custom resources ──
+- name: Get all custom resources
+  microsoft.scvmm.scvmm_custom_resource_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_crs
+
+- name: Assert all custom resources returned includes our test resource
+  ansible.builtin.assert:
+    that:
+      - all_crs.custom_resources | length >= 1
+      - test_cr_name in (all_crs.custom_resources | map(attribute='name') | list)
+
+# ── Info: non-existent custom resource returns empty list ──
+- name: Query non-existent custom resource
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "NonExistent_{{ 99999 | random }}.cr"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_cr
+
+- name: Assert empty list for non-existent custom resource
+  ansible.builtin.assert:
+    that:
+      - no_cr.custom_resources | length == 0
+
+# ── Action: present with no changes (idempotency) ──
+- name: Set custom resource with no property changes (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_change
+
+- name: Assert no change when no properties specified
+  ansible.builtin.assert:
+    that:
+      - no_change is not changed
+      - no_change.custom_resource.name == test_cr_name
+
+# ── Action: update description ──
+- name: Update custom resource description
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    description: "Ansible test custom resource description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_desc
+
+- name: Assert description was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_desc is changed
+      - update_desc.custom_resource.description == "Ansible test custom resource description"
+      - update_desc.diff.before is defined
+      - update_desc.diff.after is defined
+      - update_desc.diff.after.description == "Ansible test custom resource description"
+
+# ── Action: update description idempotency ──
+- name: Update custom resource with same description (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    description: "Ansible test custom resource description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: desc_idempotent
+
+- name: Assert no change on description idempotency
+  ansible.builtin.assert:
+    that:
+      - desc_idempotent is not changed
+
+# ── Info: verify description via info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_desc
+
+- name: Assert info module shows updated description
+  ansible.builtin.assert:
+    that:
+      - verify_desc.custom_resources[0].description == "Ansible test custom resource description"
+
+# ── Action: update family_name individually ──
+- name: Update custom resource family name only
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    family_name: "TestFamily"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_family
+
+- name: Assert family name was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_family is changed
+      - update_family.custom_resource.family_name == "TestFamily"
+      - update_family.diff.after.family_name == "TestFamily"
+
+- name: Update custom resource with same family name (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    family_name: "TestFamily"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: family_idempotent
+
+- name: Assert no change on family name idempotency
+  ansible.builtin.assert:
+    that:
+      - family_idempotent is not changed
+
+# ── Action: update release individually ──
+- name: Update custom resource release only
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    release: "1.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_release
+
+- name: Assert release was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_release is changed
+      - update_release.custom_resource.release == "1.0"
+      - update_release.diff.after.release == "1.0"
+
+- name: Update custom resource with same release (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    release: "1.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: release_idempotent
+
+- name: Assert no change on release idempotency
+  ansible.builtin.assert:
+    that:
+      - release_idempotent is not changed
+
+# ── Info: verify all properties via info module ──
+- name: Verify all properties via info module
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all
+
+- name: Assert all updated properties are correct
+  ansible.builtin.assert:
+    that:
+      - verify_all.custom_resources[0].description == "Ansible test custom resource description"
+      - verify_all.custom_resources[0].family_name == "TestFamily"
+      - verify_all.custom_resources[0].release == "1.0"
+
+# ── Action: update multiple properties at once ──
+- name: Update description and release together
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    description: "Updated multi-property"
+    release: "2.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: multi_update
+
+- name: Assert multiple properties updated
+  ansible.builtin.assert:
+    that:
+      - multi_update is changed
+      - multi_update.custom_resource.description == "Updated multi-property"
+      - multi_update.custom_resource.release == "2.0"
+      - multi_update.custom_resource.family_name == "TestFamily"
+
+# ── Action: disable custom resource ──
+- name: Disable custom resource
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    enabled: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disable_result
+
+- name: Assert custom resource was disabled
+  ansible.builtin.assert:
+    that:
+      - disable_result is changed
+      - disable_result.custom_resource.enabled == false
+
+# ── Action: disable idempotency ──
+- name: Disable custom resource again (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    enabled: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disable_idempotent
+
+- name: Assert no change on disable idempotency
+  ansible.builtin.assert:
+    that:
+      - disable_idempotent is not changed
+
+# ── Info: verify disabled state ──
+- name: Verify disabled state via info module
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_disabled
+
+- name: Assert info module shows disabled
+  ansible.builtin.assert:
+    that:
+      - verify_disabled.custom_resources[0].enabled == false
+
+# ── Action: re-enable custom resource ──
+- name: Re-enable custom resource
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    enabled: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_result
+
+- name: Assert custom resource was re-enabled
+  ansible.builtin.assert:
+    that:
+      - enable_result is changed
+      - enable_result.custom_resource.enabled == true
+
+# ── Action: re-enable idempotency ──
+- name: Re-enable custom resource again (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    enabled: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_idempotent
+
+- name: Assert no change on re-enable idempotency
+  ansible.builtin.assert:
+    that:
+      - enable_idempotent is not changed
+
+# ── Info: verify re-enabled state ──
+- name: Verify re-enabled state via info module
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_enabled
+
+- name: Assert info module shows enabled
+  ansible.builtin.assert:
+    that:
+      - verify_enabled.custom_resources[0].enabled == true
+
+# ── Action: set owner ──
+- name: Set custom resource owner
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    owner: "SCVMM\\Administrator"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_owner
+
+- name: Assert owner was set
+  ansible.builtin.assert:
+    that:
+      - set_owner.custom_resource.owner == 'SCVMM\Administrator'
+
+- name: Verify owner via info module
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_owner
+
+- name: Assert info module shows updated owner
+  ansible.builtin.assert:
+    that:
+      - verify_owner.custom_resources[0].owner == 'SCVMM\Administrator'
+
+- name: Set same owner again (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    owner: "SCVMM\\Administrator"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: owner_idempotent
+
+- name: Assert no change on owner idempotency
+  ansible.builtin.assert:
+    that:
+      - owner_idempotent is not changed
+
+# ── Action: check mode update ──
+- name: Update custom resource in check mode
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description unchanged after check mode
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert description still has previous value
+  ansible.builtin.assert:
+    that:
+      - after_check.custom_resources[0].description == "Updated multi-property"
+
+# ── Action: error for non-existent custom resource with state=present ──
+- name: Update non-existent custom resource (should fail)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "NonExistent_{{ 99999 | random }}.cr"
+    description: "This should fail"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: not_found_error
+  ignore_errors: true
+
+- name: Assert error for non-existent custom resource
+  ansible.builtin.assert:
+    that:
+      - not_found_error is failed
+      - "'not found' in not_found_error.msg"
+
+# ── Action: check mode delete ──
+- name: Delete custom resource in check mode
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode reports change for delete
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify custom resource still exists after check mode delete
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_delete
+
+- name: Assert custom resource still present
+  ansible.builtin.assert:
+    that:
+      - after_check_delete.custom_resources | length == 1
+
+# ── Action: delete custom resource ──
+- name: Remove custom resource
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: delete_result
+
+- name: Assert custom resource was removed with diff
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_result.diff.before.name == test_cr_name
+      - delete_result.diff.after == {}
+
+# ── Action: verify deletion via info module ──
+- name: Verify custom resource removed via info module
+  microsoft.scvmm.scvmm_custom_resource_info:
+    name: "{{ test_cr_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_deleted
+
+- name: Assert custom resource no longer exists
+  ansible.builtin.assert:
+    that:
+      - verify_deleted.custom_resources | length == 0
+
+# ── Action: absent idempotency ──
+- name: Remove already-deleted custom resource (idempotency)
+  microsoft.scvmm.scvmm_custom_resource:
+    name: "{{ test_cr_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed

@@ -1,0 +1,84 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_cr_name: "AnsibleTest_{{ 99999 | random }}.cr"
+
+- name: Get library share path for test custom resource placement
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module VirtualMachineManager
+      $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+      $share = Get-SCLibraryShare -VMMServer $vmmServer | Select-Object -First 1
+      if (-not $share) {
+        throw "No library share found on VMM server"
+      }
+      $Ansible.Result = @{
+        SharePath = $share.Path
+        ShareName = $share.Name
+      }
+  register: library_share
+
+- name: Create test custom resource folder on library share
+  ansible.windows.win_powershell:
+    script: |
+      param($SharePath, $CRName)
+      $crPath = Join-Path $SharePath $CRName
+      New-Item -Path $crPath -ItemType Directory -Force | Out-Null
+      Set-Content -Path (Join-Path $crPath "readme.txt") -Value "Ansible test custom resource" -Encoding UTF8
+      $Ansible.Result = $crPath
+    parameters:
+      SharePath: "{{ library_share.result.SharePath }}"
+      CRName: "{{ test_cr_name }}"
+  register: cr_folder_path
+
+- name: Refresh library share to discover the custom resource
+  ansible.windows.win_powershell:
+    script: |
+      param($ShareName, $CRName)
+      Import-Module VirtualMachineManager
+      $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+      $share = Get-SCLibraryShare -VMMServer $vmmServer | Where-Object { $_.Name -eq $ShareName }
+      Read-SCLibraryShare -LibraryShare $share | Out-Null
+      Start-Sleep -Seconds 5
+      $cr = Get-SCCustomResource -VMMServer $vmmServer | Where-Object { $_.Name -eq $CRName }
+      $Ansible.Result = @{
+        Found = ($null -ne $cr)
+        Name = if ($cr) { $cr.Name } else { $null }
+      }
+    parameters:
+      ShareName: "{{ library_share.result.ShareName }}"
+      CRName: "{{ test_cr_name }}"
+  register: refresh_result
+  retries: 3
+  delay: 10
+  until: refresh_result.result.Found | default(false)
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test custom resource from VMM
+      microsoft.scvmm.scvmm_custom_resource:
+        name: "{{ test_cr_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Delete test custom resource folder from disk
+      ansible.windows.win_file:
+        path: "{{ cr_folder_path.result }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Teardown - Refresh library share
+      ansible.windows.win_powershell:
+        script: |
+          param($ShareName)
+          Import-Module VirtualMachineManager
+          $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+          $share = Get-SCLibraryShare -VMMServer $vmmServer | Where-Object { $_.Name -eq $ShareName }
+          if ($share) { Read-SCLibraryShare -LibraryShare $share | Out-Null }
+        parameters:
+          ShareName: "{{ library_share.result.ShareName }}"
+      ignore_errors: true
