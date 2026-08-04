@@ -1,0 +1,58 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_share_name: "AnsibleTest_LibShare_{{ 99999 | random }}"
+
+- name: Create Windows share for testing
+  ansible.windows.win_powershell:
+    script: |
+      param($ShareName)
+      $sharePath = "C:\$ShareName"
+      if (-not (Test-Path $sharePath)) {
+          New-Item -Path $sharePath -ItemType Directory -Force | Out-Null
+      }
+      if (-not (Get-SmbShare -Name $ShareName -ErrorAction SilentlyContinue)) {
+          New-SmbShare -Name $ShareName -Path $sharePath -FullAccess Everyone | Out-Null
+      }
+      $Ansible.Result = "\\$env:COMPUTERNAME\$ShareName"
+    parameters:
+      ShareName: "{{ test_share_name }}"
+  register: share_setup
+
+- name: Set test share path fact
+  ansible.builtin.set_fact:
+    test_share_path: "{{ share_setup.result }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove library share from VMM
+      microsoft.scvmm.scvmm_library_share:
+        name: "{{ test_share_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate library share removed
+      microsoft.scvmm.scvmm_library_share:
+        name: "{{ test_share_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      ansible.builtin.assert:
+        that:
+          - teardown_validate.changed == false
+
+    - name: Teardown - Remove Windows share
+      ansible.windows.win_powershell:
+        script: |
+          param($ShareName)
+          Remove-SmbShare -Name $ShareName -Force -ErrorAction SilentlyContinue
+          Remove-Item -Path "C:\$ShareName" -Recurse -Force -ErrorAction SilentlyContinue
+        parameters:
+          ShareName: "{{ test_share_name }}"
+      ignore_errors: true

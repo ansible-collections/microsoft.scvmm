@@ -1,0 +1,410 @@
+---
+# ── Create library share in check mode ──
+- name: Add library share in check mode
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    share_path: "{{ test_share_path }}"
+    description: "Ansible test library share"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  diff: true
+  register: create_check
+
+- name: Assert check mode reports change with all fields
+  ansible.builtin.assert:
+    that:
+      - create_check is changed
+      - create_check.library_share is defined
+      - create_check.library_share.name == test_share_name
+      - create_check.library_share.description == "Ansible test library share"
+      - create_check.library_share.share_path == test_share_path
+      - create_check.library_share.id is none
+      - create_check.library_share.library_server is none
+      - create_check.library_share.use_alternate_data_stream == false
+      - create_check.diff.before == {}
+      - create_check.diff.after.name == test_share_name
+
+- name: Verify share not actually created in check mode
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert share was not created
+  ansible.builtin.assert:
+    that:
+      - after_check_create.library_shares | length == 0
+
+# ── Create library share ──
+- name: Add library share
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    share_path: "{{ test_share_path }}"
+    description: "Ansible test library share"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: create_result
+
+- name: Assert library share was added with all fields
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.library_share is defined
+      - create_result.library_share.id is not none
+      - create_result.library_share.name == test_share_name
+      - create_result.library_share.share_path is not none
+      - create_result.library_share.description == "Ansible test library share"
+      - create_result.library_share.library_server is not none
+      - create_result.library_share.library_server | length > 0
+      - create_result.library_share.use_alternate_data_stream is defined
+      - create_result.diff.before == {}
+      - create_result.diff.after.name == test_share_name
+      - create_result.diff.after.description == "Ansible test library share"
+
+# ── Verify creation with info module ──
+- name: Verify library share exists via info module
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created share
+  ansible.builtin.assert:
+    that:
+      - verify_create.library_shares | length == 1
+      - verify_create.library_shares[0].id is not none
+      - verify_create.library_shares[0].name == test_share_name
+      - verify_create.library_shares[0].share_path is not none
+      - verify_create.library_shares[0].library_server | length > 0
+      - verify_create.library_shares[0].use_alternate_data_stream is defined
+
+# ── Info: query all ──
+- name: Get all library shares
+  microsoft.scvmm.scvmm_library_share_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_shares
+
+- name: Assert test share appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_shares.library_shares | length > 0
+      - test_share_name in (all_shares.library_shares | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Get non-existent library share
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "NonExistent_Share_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.library_shares | length == 0
+
+# ── Idempotency ──
+- name: Add same library share again (idempotency)
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    share_path: "{{ test_share_path }}"
+    description: "Ansible test library share"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update library share description
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_result
+
+- name: Assert description was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_result is changed
+      - update_result.diff.before.description == "Ansible test library share"
+      - update_result.diff.after.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_update.library_shares[0].description == "Updated test description"
+
+# ── Update description idempotency ──
+- name: Set same description again (idempotency)
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    description: "Updated test description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: desc_idempotent
+
+- name: Assert no change on description idempotency
+  ansible.builtin.assert:
+    that:
+      - desc_idempotent is not changed
+
+# ── Check mode update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode.library_shares[0].description == "Updated test description"
+
+# ── Error: missing share_path on create ──
+- name: Try to add share without share_path
+  microsoft.scvmm.scvmm_library_share:
+    name: "NonExistent_Share_{{ 99999 | random }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_path_error
+  ignore_errors: true
+
+- name: Assert error about missing share_path
+  ansible.builtin.assert:
+    that:
+      - no_path_error is failed
+      - "'share_path' in no_path_error.msg"
+
+# ── Error: name/path mismatch ──
+- name: Try to add share with mismatched name
+  microsoft.scvmm.scvmm_library_share:
+    name: "MismatchedName"
+    share_path: "{{ test_share_path }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: mismatch_error
+  ignore_errors: true
+
+- name: Assert error about name/path mismatch
+  ansible.builtin.assert:
+    that:
+      - mismatch_error is failed
+      - "'must match' in mismatch_error.msg"
+
+# ── Update use_alternate_data_stream ──
+- name: Get current use_alternate_data_stream value
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: current_ads
+
+- name: Set use_alternate_data_stream to opposite of current
+  ansible.builtin.set_fact:
+    test_ads_value: "{{ not current_ads.library_shares[0].use_alternate_data_stream }}"
+
+- name: Toggle use_alternate_data_stream
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    use_alternate_data_stream: "{{ test_ads_value }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: ads_toggle
+
+- name: Assert use_alternate_data_stream was changed
+  ansible.builtin.assert:
+    that:
+      - ads_toggle is changed
+
+# ── use_alternate_data_stream idempotency ──
+- name: Set same use_alternate_data_stream again (idempotency)
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    use_alternate_data_stream: "{{ test_ads_value }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: ads_idempotent
+
+- name: Assert no change on use_alternate_data_stream idempotency
+  ansible.builtin.assert:
+    that:
+      - ads_idempotent is not changed
+
+# ── Verify use_alternate_data_stream via info ──
+- name: Verify use_alternate_data_stream via info module
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_ads
+
+- name: Assert info module shows updated use_alternate_data_stream
+  ansible.builtin.assert:
+    that:
+      - verify_ads.library_shares[0].use_alternate_data_stream == (test_ads_value | bool)
+
+# ── Toggle use_alternate_data_stream back ──
+- name: Toggle use_alternate_data_stream back
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    use_alternate_data_stream: "{{ not (test_ads_value | bool) }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: ads_toggle_back
+
+- name: Assert use_alternate_data_stream was toggled back
+  ansible.builtin.assert:
+    that:
+      - ads_toggle_back is changed
+
+# ── Check mode delete ──
+- name: Remove library share in check mode
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: delete_check
+
+- name: Assert check mode reports change for delete
+  ansible.builtin.assert:
+    that:
+      - delete_check is changed
+
+- name: Verify share still exists after check mode delete
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_delete
+
+- name: Assert share still present
+  ansible.builtin.assert:
+    that:
+      - after_check_delete.library_shares | length == 1
+
+# ── Delete library share ──
+- name: Remove library share
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: delete_result
+
+- name: Assert library share was removed with diff
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_result.diff.before.name == test_share_name
+      - delete_result.diff.after == {}
+
+# ── Verify deletion with info module ──
+- name: Verify library share is gone via info module
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted share
+  ansible.builtin.assert:
+    that:
+      - verify_delete.library_shares | length == 0
+
+# ── Absent idempotency ──
+- name: Remove already-removed library share (idempotency)
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed
+
+# ── Create with use_alternate_data_stream and add_default_resources ──
+- name: Add library share with use_alternate_data_stream at create time
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    share_path: "{{ test_share_path }}"
+    description: "Create with params test"
+    use_alternate_data_stream: true
+    add_default_resources: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_with_params
+
+- name: Assert share created with params
+  ansible.builtin.assert:
+    that:
+      - create_with_params is changed
+      - create_with_params.library_share.name == test_share_name
+      - create_with_params.library_share.description == "Create with params test"
+
+- name: Verify use_alternate_data_stream was set at create time
+  microsoft.scvmm.scvmm_library_share_info:
+    name: "{{ test_share_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create_params
+
+- name: Assert use_alternate_data_stream set at create time
+  ansible.builtin.assert:
+    that:
+      - verify_create_params.library_shares[0].use_alternate_data_stream == true
+
+- name: Verify add_default_resources actually added resources
+  ansible.windows.win_powershell:
+    script: |
+      param($ShareName, $ServerName)
+      Import-Module VirtualMachineManager
+      $vmmServer = Get-SCVMMServer -ComputerName $ServerName
+      $share = Get-SCLibraryShare -VMMServer $vmmServer | Where-Object { $_.Name -eq $ShareName }
+      $resources = Get-SCVMTemplate -VMMServer $vmmServer | Where-Object { $_.LibraryShare.Name -eq $ShareName }
+      $allResources = @(Get-ChildItem -Path $share.Path -Recurse -File -ErrorAction SilentlyContinue)
+      $Ansible.Result = @{
+        ShareExists = ($null -ne $share)
+        ResourceFileCount = $allResources.Count
+      }
+    parameters:
+      ShareName: "{{ test_share_name }}"
+      ServerName: "{{ scvmm_server }}"
+  register: default_resources
+
+- name: Assert default resources were added to the library share
+  ansible.builtin.assert:
+    that:
+      - default_resources.result.ShareExists == true
+      - default_resources.result.ResourceFileCount > 0
+
+- name: Clean up share created with params
+  microsoft.scvmm.scvmm_library_share:
+    name: "{{ test_share_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
