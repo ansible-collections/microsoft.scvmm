@@ -1,0 +1,7 @@
+---
+scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_host_group_name: All Hosts
+test_managed_computer: WIN-5UL8TNLBCNF.scvmm.local
+test_wsus_server: WIN-5UL8TNLBCNF.scvmm.local
+test_wsus_port: 8530
+test_run_as_account: VMM Host RunAs

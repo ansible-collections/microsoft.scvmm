@@ -294,6 +294,9 @@ If $true, fails the module when no object is found. Default $false.
 Optional scriptblock for client-side filtering (e.g. for cmdlets without -Name parameter).
 .PARAMETER AllowMultiple
 If $true, returns all matching objects instead of failing when multiple are found. Default $false.
+.PARAMETER LookupParam
+The cmdlet parameter name used for lookup. Default 'Name'. Set to 'ComputerName' for cmdlets
+like Get-SCVMMManagedComputer that use -ComputerName instead of -Name.
 #>
 function Get-SCVMMObject {
     param (
@@ -314,14 +317,17 @@ function Get-SCVMMObject {
 
         [scriptblock]$FilterScript,
 
-        [bool]$AllowMultiple = $false
+        [bool]$AllowMultiple = $false,
+
+        [string]$LookupParam = 'Name'
     )
 
     $typeName = if ($ObjectType) { $ObjectType } else { $CmdletName -replace '^Get-SC', '' }
 
     try {
         if ($Name -and -not $FilterScript) {
-            $objects = @(& $CmdletName -VMMServer $VMMConnection -Name $Name -ErrorAction Stop)
+            $lookupParams = @{ $LookupParam = $Name; VMMServer = $VMMConnection; ErrorAction = 'Stop' }
+            $objects = @(& $CmdletName @lookupParams)
         }
         else {
             $objects = @(& $CmdletName -VMMServer $VMMConnection -ErrorAction Stop)
@@ -397,6 +403,31 @@ function Get-SCVMMVirtualMachine {
     return $vms[0]
 }
 
+<#
+.SYNOPSIS
+Compares a collection of enabled SCVMM objects against a desired name list.
+
+.PARAMETER CurrentCollection
+The current collection of SCVMM objects with IsEnabled and name properties.
+.PARAMETER NameProperty
+The property name to extract from each object. Defaults to 'Name'.
+.PARAMETER DesiredNames
+The desired list of names to compare against.
+#>
+function Test-SCVMMListChanged {
+    param (
+        [array]$CurrentCollection,
+        [string]$NameProperty = 'Name',
+        [array]$DesiredNames
+    )
+    $enabledItems = $CurrentCollection | Where-Object { $_.IsEnabled }
+    $currentNames = @($enabledItems | ForEach-Object { $_.$NameProperty } | Where-Object { $_ }) | Sort-Object
+    $desiredSorted = @($DesiredNames) | Sort-Object
+    if ($currentNames.Count -ne $desiredSorted.Count) { return $true }
+    if ($currentNames.Count -eq 0) { return $false }
+    return [bool](Compare-Object -ReferenceObject $currentNames -DifferenceObject $desiredSorted)
+}
+
 Export-ModuleMember -Function 'Connect-SCVMMServerSession', 'Remove-SCVMMVirtualMachine', `
     'Get-SCVMMResultFromMap', 'Test-SCVMMPropertiesChanged', 'Get-SCVMMParametersFromMap', `
-    'Get-SCVMMCheckModeDiff', 'Get-SCVMMObject', 'Get-SCVMMVirtualMachine'
+    'Get-SCVMMCheckModeDiff', 'Get-SCVMMObject', 'Get-SCVMMVirtualMachine', 'Test-SCVMMListChanged'
