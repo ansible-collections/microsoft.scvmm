@@ -1,0 +1,83 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_script_name: "AnsibleTest_{{ 99999 | random }}.ps1"
+
+- name: Get library share path for test script placement
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module VirtualMachineManager
+      $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+      $share = Get-SCLibraryShare -VMMServer $vmmServer | Select-Object -First 1
+      if (-not $share) {
+        throw "No library share found on VMM server"
+      }
+      $Ansible.Result = @{
+        SharePath = $share.Path
+        ShareName = $share.Name
+      }
+  register: library_share
+
+- name: Create test script file on library share
+  ansible.windows.win_powershell:
+    script: |
+      param($SharePath, $ScriptName)
+      $scriptPath = Join-Path $SharePath $ScriptName
+      Set-Content -Path $scriptPath -Value "# Ansible test script" -Encoding UTF8
+      $Ansible.Result = $scriptPath
+    parameters:
+      SharePath: "{{ library_share.result.SharePath }}"
+      ScriptName: "{{ test_script_name }}"
+  register: script_file_path
+
+- name: Refresh library share to discover the script
+  ansible.windows.win_powershell:
+    script: |
+      param($ShareName, $ScriptName)
+      Import-Module VirtualMachineManager
+      $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+      $share = Get-SCLibraryShare -VMMServer $vmmServer | Where-Object { $_.Name -eq $ShareName }
+      Read-SCLibraryShare -LibraryShare $share | Out-Null
+      Start-Sleep -Seconds 5
+      $script = Get-SCScript -VMMServer $vmmServer | Where-Object { $_.Name -eq $ScriptName }
+      $Ansible.Result = @{
+        Found = ($null -ne $script)
+        Name = if ($script) { $script.Name } else { $null }
+      }
+    parameters:
+      ShareName: "{{ library_share.result.ShareName }}"
+      ScriptName: "{{ test_script_name }}"
+  register: refresh_result
+  retries: 3
+  delay: 10
+  until: refresh_result.result.Found | default(false)
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test script from VMM
+      microsoft.scvmm.scvmm_script:
+        name: "{{ test_script_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Delete test script file from disk
+      ansible.windows.win_file:
+        path: "{{ script_file_path.result }}"
+        state: absent
+      ignore_errors: true
+
+    - name: Teardown - Refresh library share
+      ansible.windows.win_powershell:
+        script: |
+          param($ShareName)
+          Import-Module VirtualMachineManager
+          $vmmServer = Get-SCVMMServer -ComputerName "{{ scvmm_server }}"
+          $share = Get-SCLibraryShare -VMMServer $vmmServer | Where-Object { $_.Name -eq $ShareName }
+          if ($share) { Read-SCLibraryShare -LibraryShare $share | Out-Null }
+        parameters:
+          ShareName: "{{ library_share.result.ShareName }}"
+      ignore_errors: true
