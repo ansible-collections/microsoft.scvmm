@@ -1,0 +1,574 @@
+---
+# ── Create servicing window (daily) ──
+- name: Create daily servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    description: "AnsibleTest daily servicing window"
+    days_to_recur: 1
+    start_time_of_day: "02:00:00"
+    minutes_duration: 120
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert servicing window was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.servicing_window.name == test_sw_name
+      - create_result.servicing_window.description == "AnsibleTest daily servicing window"
+      - create_result.servicing_window.minutes_duration == 120
+
+# ── Verify creation with info module ──
+- name: Verify servicing window exists via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created window
+  ansible.builtin.assert:
+    that:
+      - verify_create.servicing_windows | length == 1
+      - verify_create.servicing_windows[0].name == test_sw_name
+      - verify_create.servicing_windows[0].id is defined
+      - verify_create.servicing_windows[0].minutes_duration == 120
+
+# ── Info: query all ──
+- name: Get all servicing windows
+  microsoft.scvmm.scvmm_servicing_window_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_windows
+
+- name: Assert test window appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_windows.servicing_windows | length > 0
+      - test_sw_name in (all_windows.servicing_windows | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Get non-existent servicing window
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "NonExistent_ServWin_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.servicing_windows | length == 0
+
+# ── Idempotency ──
+- name: Create same servicing window again
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    description: "AnsibleTest daily servicing window"
+    days_to_recur: 1
+    start_time_of_day: "02:00:00"
+    minutes_duration: 120
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update servicing window description
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    description: "Updated test description"
+    days_to_recur: 1
+    start_time_of_day: "02:00:00"
+    minutes_duration: 120
+    vmm_server: "{{ scvmm_server }}"
+  register: update_desc_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_desc_result is changed
+      - update_desc_result.servicing_window.description == "Updated test description"
+
+# ── Verify update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_desc_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_desc_update.servicing_windows[0].description == "Updated test description"
+
+# ── Update duration ──
+- name: Update servicing window duration
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    description: "Updated test description"
+    days_to_recur: 1
+    start_time_of_day: "02:00:00"
+    minutes_duration: 240
+    vmm_server: "{{ scvmm_server }}"
+  register: update_duration_result
+
+- name: Assert duration was updated
+  ansible.builtin.assert:
+    that:
+      - update_duration_result is changed
+      - update_duration_result.servicing_window.minutes_duration == 240
+
+# ── Update category ──
+- name: Update servicing window category
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    category: "TestCategory"
+    days_to_recur: 1
+    start_time_of_day: "02:00:00"
+    minutes_duration: 240
+    vmm_server: "{{ scvmm_server }}"
+  register: update_category_result
+
+- name: Assert category was updated
+  ansible.builtin.assert:
+    that:
+      - update_category_result is changed
+
+- name: Verify category update via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_category
+
+- name: Assert info module sees updated category
+  ansible.builtin.assert:
+    that:
+      - verify_category.servicing_windows[0].category == "TestCategory"
+
+# ── Update owner ──
+- name: Update servicing window owner
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    owner: "TestOwner"
+    days_to_recur: 1
+    start_time_of_day: "02:00:00"
+    minutes_duration: 240
+    vmm_server: "{{ scvmm_server }}"
+  register: update_owner_result
+
+- name: Assert owner was updated
+  ansible.builtin.assert:
+    that:
+      - update_owner_result is changed
+
+- name: Verify owner update via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_owner
+
+- name: Assert info module sees updated owner
+  ansible.builtin.assert:
+    that:
+      - verify_owner.servicing_windows[0].owner == "TestOwner"
+
+# ── Update start_date ──
+- name: Update servicing window start_date
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    start_date: "2025-06-01"
+    days_to_recur: 1
+    start_time_of_day: "02:00:00"
+    minutes_duration: 240
+    vmm_server: "{{ scvmm_server }}"
+  register: update_start_date_result
+
+- name: Assert start_date was updated
+  ansible.builtin.assert:
+    that:
+      - update_start_date_result is changed
+
+- name: Verify start_date update via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_start_date
+
+- name: Assert info module sees updated start_date
+  ansible.builtin.assert:
+    that:
+      - "'2025-06-01' in verify_start_date.servicing_windows[0].start_date"
+
+# ── Update schedule: change to weekly ──
+- name: Change schedule to weekly
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    weekly_schedule_day_of_week: Sunday
+    start_time_of_day: "02:00:00"
+    minutes_duration: 240
+    vmm_server: "{{ scvmm_server }}"
+  register: update_weekly_result
+
+- name: Assert schedule changed to weekly
+  ansible.builtin.assert:
+    that:
+      - update_weekly_result is changed
+
+# ── Verify weekly schedule with info module ──
+- name: Verify weekly schedule via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_weekly
+
+- name: Assert info module shows weekly schedule
+  ansible.builtin.assert:
+    that:
+      - verify_weekly.servicing_windows[0].weekly_schedule_day_of_week == "Sunday"
+
+# ── Weekly with weeks_to_recur ──
+- name: Update weekly schedule with weeks_to_recur
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    weekly_schedule_day_of_week: Sunday
+    weeks_to_recur: 2
+    start_time_of_day: "02:00:00"
+    minutes_duration: 240
+    vmm_server: "{{ scvmm_server }}"
+  register: update_weeks_recur
+
+- name: Assert weeks_to_recur was updated
+  ansible.builtin.assert:
+    that:
+      - update_weeks_recur is changed
+
+- name: Verify weeks_to_recur via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_weeks_recur
+
+- name: Assert info shows weeks_to_recur
+  ansible.builtin.assert:
+    that:
+      - verify_weeks_recur.servicing_windows[0].weeks_to_recur == 2
+
+# ── Check mode: update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    description: "Check mode description"
+    weekly_schedule_day_of_week: Sunday
+    start_time_of_day: "02:00:00"
+    minutes_duration: 240
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_result is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode.servicing_windows[0].description != "Check mode description"
+
+# ── Check mode: create ──
+- name: Create new window in check mode
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "AnsibleTest_CheckMode_{{ 99999 | random }}"
+    days_to_recur: 1
+    minutes_duration: 60
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_create
+
+- name: Assert check mode create reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_create is changed
+
+# ── Error: create without schedule ──
+- name: Attempt to create without schedule params
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "AnsibleTest_NoSchedule_{{ 99999 | random }}"
+    description: "Should fail"
+    minutes_duration: 60
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_schedule_result
+  ignore_errors: true
+
+- name: Assert creation without schedule fails
+  ansible.builtin.assert:
+    that:
+      - no_schedule_result is failed
+      - "'schedule frequency parameter is required' in no_schedule_result.msg"
+
+# ── Check mode: delete ──
+- name: Delete servicing window in check mode
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode delete reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify check mode did not actually delete
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_delete
+
+- name: Assert window still exists after check mode delete
+  ansible.builtin.assert:
+    that:
+      - verify_check_delete.servicing_windows | length == 1
+
+# ── Rename (new_name) ──
+- name: Rename servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    new_name: "{{ test_sw_name }}_renamed"
+    vmm_server: "{{ scvmm_server }}"
+  register: rename_result
+
+- name: Assert rename was successful
+  ansible.builtin.assert:
+    that:
+      - rename_result is changed
+
+- name: Verify old name no longer exists
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_old_name
+
+- name: Assert old name is gone
+  ansible.builtin.assert:
+    that:
+      - verify_old_name.servicing_windows | length == 0
+
+- name: Verify new name exists
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}_renamed"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_new_name
+
+- name: Assert new name exists
+  ansible.builtin.assert:
+    that:
+      - verify_new_name.servicing_windows | length == 1
+      - verify_new_name.servicing_windows[0].name == test_sw_name + "_renamed"
+
+- name: Rename window back for cleanup
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}_renamed"
+    new_name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: rename_back
+
+- name: Assert rename back was successful
+  ansible.builtin.assert:
+    that:
+      - rename_back is changed
+
+# ── Delete servicing window ──
+- name: Delete servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert window was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify servicing window is gone via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted window
+  ansible.builtin.assert:
+    that:
+      - verify_delete.servicing_windows | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed
+
+# ── Monthly schedule (day_of_month) ──
+- name: Create monthly servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_monthly_name }}"
+    description: "Monthly on 15th"
+    day_of_month: 15
+    start_time_of_day: "03:00:00"
+    minutes_duration: 180
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_monthly
+
+- name: Assert monthly window was created
+  ansible.builtin.assert:
+    that:
+      - create_monthly is changed
+      - create_monthly.servicing_window.name == test_sw_monthly_name
+
+- name: Verify monthly schedule via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_monthly_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_monthly
+
+- name: Assert info shows monthly schedule
+  ansible.builtin.assert:
+    that:
+      - verify_monthly.servicing_windows | length == 1
+      - verify_monthly.servicing_windows[0].day_of_month == 15
+
+- name: Idempotency check for monthly window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_monthly_name }}"
+    description: "Monthly on 15th"
+    day_of_month: 15
+    start_time_of_day: "03:00:00"
+    minutes_duration: 180
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: monthly_idempotent
+
+- name: Assert monthly idempotency
+  ansible.builtin.assert:
+    that:
+      - monthly_idempotent is not changed
+
+# ── Monthly with months_to_recur ──
+- name: Update monthly window with months_to_recur
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_monthly_name }}"
+    day_of_month: 15
+    months_to_recur: 3
+    start_time_of_day: "03:00:00"
+    minutes_duration: 180
+    vmm_server: "{{ scvmm_server }}"
+  register: update_months_recur
+
+- name: Assert months_to_recur was updated
+  ansible.builtin.assert:
+    that:
+      - update_months_recur is changed
+
+- name: Verify months_to_recur via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_monthly_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_months_recur
+
+- name: Assert info shows months_to_recur
+  ansible.builtin.assert:
+    that:
+      - verify_months_recur.servicing_windows[0].months_to_recur == 3
+
+- name: Delete monthly servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_monthly_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_monthly
+
+- name: Assert monthly window was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_monthly is changed
+
+# ── Monthly-relative schedule ──
+- name: Create monthly-relative servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_monthly_rel_name }}"
+    description: "Second Monday of month"
+    monthly_schedule_day_of_week: Monday
+    week_of_month: Second
+    start_time_of_day: "01:00:00"
+    minutes_duration: 360
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_monthly_rel
+
+- name: Assert monthly-relative window was created
+  ansible.builtin.assert:
+    that:
+      - create_monthly_rel is changed
+      - create_monthly_rel.servicing_window.name == test_sw_monthly_rel_name
+
+- name: Verify monthly-relative schedule via info module
+  microsoft.scvmm.scvmm_servicing_window_info:
+    name: "{{ test_sw_monthly_rel_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_monthly_rel
+
+- name: Assert info shows monthly-relative schedule
+  ansible.builtin.assert:
+    that:
+      - verify_monthly_rel.servicing_windows | length == 1
+      - verify_monthly_rel.servicing_windows[0].monthly_schedule_day_of_week == "Monday"
+      - verify_monthly_rel.servicing_windows[0].week_of_month == "Second"
+
+- name: Idempotency check for monthly-relative window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_monthly_rel_name }}"
+    description: "Second Monday of month"
+    monthly_schedule_day_of_week: Monday
+    week_of_month: Second
+    start_time_of_day: "01:00:00"
+    minutes_duration: 360
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: monthly_rel_idempotent
+
+- name: Assert monthly-relative idempotency
+  ansible.builtin.assert:
+    that:
+      - monthly_rel_idempotent is not changed
+
+- name: Delete monthly-relative servicing window
+  microsoft.scvmm.scvmm_servicing_window:
+    name: "{{ test_sw_monthly_rel_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_monthly_rel
+
+- name: Assert monthly-relative window was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_monthly_rel is changed
