@@ -1,0 +1,9 @@
+---
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - No cleanup needed for job tests
+      ansible.builtin.debug:
+        msg: "Job tests completed - jobs are read-only resources"
