@@ -265,3 +265,5 @@ releases:
         name: scvmm_vm_subnet_info
         namespace: ''
     release_date: '2026-08-02'
+  1.0.1:
+    release_date: '2026-08-06'
