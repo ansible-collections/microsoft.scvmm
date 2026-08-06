@@ -1,0 +1,51 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_sw_name: "AnsibleTest_ServWin_{{ 99999 | random }}"
+    test_sw_monthly_name: "AnsibleTest_Monthly_{{ 99999 | random }}"
+    test_sw_monthly_rel_name: "AnsibleTest_MonthlyRel_{{ 99999 | random }}"
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove test servicing window
+      microsoft.scvmm.scvmm_servicing_window:
+        name: "{{ test_sw_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove renamed test servicing window
+      microsoft.scvmm.scvmm_servicing_window:
+        name: "{{ test_sw_name }}_renamed"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove monthly test servicing window
+      microsoft.scvmm.scvmm_servicing_window:
+        name: "{{ test_sw_monthly_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove monthly-relative test servicing window
+      microsoft.scvmm.scvmm_servicing_window:
+        name: "{{ test_sw_monthly_rel_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate servicing windows removed
+      microsoft.scvmm.scvmm_servicing_window_info:
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert test windows are clean
+      ansible.builtin.assert:
+        that:
+          - test_sw_name not in (teardown_validate.servicing_windows | map(attribute='name') | list)
+          - test_sw_monthly_name not in (teardown_validate.servicing_windows | map(attribute='name') | list)
+          - test_sw_monthly_rel_name not in (teardown_validate.servicing_windows | map(attribute='name') | list)
