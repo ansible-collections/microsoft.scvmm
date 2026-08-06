@@ -1,0 +1,430 @@
+---
+# ── Create custom property ──
+- name: Create custom property
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: "AnsibleTest custom property"
+    member_types:
+      - VM
+      - VMHost
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_result
+
+- name: Assert custom property was created
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.custom_property.name == test_custom_prop_name
+      - create_result.custom_property.description == "AnsibleTest custom property"
+      - create_result.custom_property.member_types | length == 2
+      - "'VM' in create_result.custom_property.member_types"
+      - "'VMHost' in create_result.custom_property.member_types"
+
+# ── Verify creation with info module ──
+- name: Verify custom property exists via info module
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_create
+
+- name: Assert info module sees the created property
+  ansible.builtin.assert:
+    that:
+      - verify_create.custom_properties | length == 1
+      - verify_create.custom_properties[0].name == test_custom_prop_name
+      - verify_create.custom_properties[0].id is defined
+      - verify_create.custom_properties[0].description == "AnsibleTest custom property"
+      - verify_create.custom_properties[0].member_types | length == 2
+
+# ── Info: query all ──
+- name: Get all custom properties
+  microsoft.scvmm.scvmm_custom_property_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_properties
+
+- name: Assert test property appears in all results
+  ansible.builtin.assert:
+    that:
+      - all_properties.custom_properties | length > 0
+      - test_custom_prop_name in (all_properties.custom_properties | map(attribute='name') | list)
+
+# ── Info: query non-existent ──
+- name: Get non-existent custom property
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "NonExistent_CustomProp_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: non_existent
+
+- name: Assert non-existent returns empty list
+  ansible.builtin.assert:
+    that:
+      - non_existent.custom_properties | length == 0
+
+# ── Idempotency ──
+- name: Create same custom property again
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: "AnsibleTest custom property"
+    member_types:
+      - VM
+      - VMHost
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_result
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_result is not changed
+
+# ── Update description ──
+- name: Update custom property description
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: "Updated test description"
+    member_types:
+      - VM
+      - VMHost
+    vmm_server: "{{ scvmm_server }}"
+  register: update_desc_result
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_desc_result is changed
+      - update_desc_result.custom_property.description == "Updated test description"
+
+# ── Verify description update with info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_desc_update
+
+- name: Assert info module sees updated description
+  ansible.builtin.assert:
+    that:
+      - verify_desc_update.custom_properties[0].description == "Updated test description"
+
+# ── Update member types: add a type ──
+- name: Add Cloud member type
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: "Updated test description"
+    member_types:
+      - VM
+      - VMHost
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+  register: add_member_result
+
+- name: Assert member type was added
+  ansible.builtin.assert:
+    that:
+      - add_member_result is changed
+      - add_member_result.custom_property.member_types | length == 3
+      - "'Cloud' in add_member_result.custom_property.member_types"
+
+# ── Verify member type addition with info module ──
+- name: Verify member type addition via info module
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_add_member
+
+- name: Assert info module sees added member type
+  ansible.builtin.assert:
+    that:
+      - verify_add_member.custom_properties[0].member_types | length == 3
+      - "'Cloud' in verify_add_member.custom_properties[0].member_types"
+
+# ── Update member types: remove a type ──
+- name: Remove VMHost member type
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: "Updated test description"
+    member_types:
+      - VM
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+  register: remove_member_result
+
+- name: Assert member type was removed
+  ansible.builtin.assert:
+    that:
+      - remove_member_result is changed
+      - remove_member_result.custom_property.member_types | length == 2
+      - "'VMHost' not in remove_member_result.custom_property.member_types"
+      - "'VM' in remove_member_result.custom_property.member_types"
+      - "'Cloud' in remove_member_result.custom_property.member_types"
+
+# ── Member types idempotency ──
+- name: Set same member types again
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: "Updated test description"
+    member_types:
+      - VM
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+  register: member_idempotent
+
+- name: Assert no change on member types idempotency
+  ansible.builtin.assert:
+    that:
+      - member_idempotent is not changed
+
+# ── Check mode: update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: "Check mode description"
+    member_types:
+      - VM
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_result is changed
+
+- name: Verify check mode did not actually change description
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_mode
+
+- name: Assert description unchanged after check mode
+  ansible.builtin.assert:
+    that:
+      - verify_check_mode.custom_properties[0].description == "Updated test description"
+
+# ── Check mode: create ──
+- name: Create new property in check mode
+  microsoft.scvmm.scvmm_custom_property:
+    name: "AnsibleTest_CheckMode_{{ 99999 | random }}"
+    member_types:
+      - VM
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_create
+
+- name: Assert check mode create reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_create is changed
+
+# ── Info: filter by member type ──
+- name: Get custom properties for VM member type
+  microsoft.scvmm.scvmm_custom_property_info:
+    member: VM
+    vmm_server: "{{ scvmm_server }}"
+  register: vm_member_result
+
+- name: Assert member filter returns results including test property
+  ansible.builtin.assert:
+    that:
+      - vm_member_result.custom_properties | length > 0
+      - test_custom_prop_name in (vm_member_result.custom_properties | map(attribute='name') | list)
+
+- name: Get custom properties for ProtectionUnit member type
+  microsoft.scvmm.scvmm_custom_property_info:
+    member: ProtectionUnit
+    vmm_server: "{{ scvmm_server }}"
+  register: protection_member_result
+
+- name: Assert ProtectionUnit filter does not include test property
+  ansible.builtin.assert:
+    that:
+      - test_custom_prop_name not in (protection_member_result.custom_properties | map(attribute='name') | list)
+
+# ── Create without description ──
+- name: Create custom property without description
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_nodesc_name }}"
+    member_types:
+      - VM
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: create_nodesc
+
+- name: Assert property created without description
+  ansible.builtin.assert:
+    that:
+      - create_nodesc is changed
+      - create_nodesc.custom_property.name == test_custom_prop_nodesc_name
+
+- name: Verify no-description property via info
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_nodesc_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_nodesc
+
+- name: Assert description is empty
+  ansible.builtin.assert:
+    that:
+      - verify_nodesc.custom_properties[0].description == ""
+
+- name: Cleanup no-description property
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_nodesc_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+
+# ── Update to clear description ──
+- name: Clear custom property description
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    description: ""
+    member_types:
+      - VM
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+  register: clear_desc_result
+
+- name: Assert description was cleared
+  ansible.builtin.assert:
+    that:
+      - clear_desc_result is changed
+
+- name: Verify description cleared via info
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_clear_desc
+
+- name: Assert description is empty after clear
+  ansible.builtin.assert:
+    that:
+      - verify_clear_desc.custom_properties[0].description == ""
+
+# ── Rename (new_name) ──
+- name: Rename custom property
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    new_name: "{{ test_custom_prop_name }}_renamed"
+    member_types:
+      - VM
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+  register: rename_result
+
+- name: Assert rename was successful
+  ansible.builtin.assert:
+    that:
+      - rename_result is changed
+
+- name: Verify old name no longer exists
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_old_name
+
+- name: Assert old name is gone
+  ansible.builtin.assert:
+    that:
+      - verify_old_name.custom_properties | length == 0
+
+- name: Verify new name exists
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}_renamed"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_new_name
+
+- name: Assert new name exists
+  ansible.builtin.assert:
+    that:
+      - verify_new_name.custom_properties | length == 1
+      - verify_new_name.custom_properties[0].name == test_custom_prop_name + "_renamed"
+
+# ── Rename idempotency ──
+- name: Rename with new_name matching current name
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}_renamed"
+    new_name: "{{ test_custom_prop_name }}_renamed"
+    member_types:
+      - VM
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+  register: rename_noop
+
+- name: Assert no change when new_name matches current name
+  ansible.builtin.assert:
+    that:
+      - rename_noop is not changed
+
+- name: Rename back for cleanup
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}_renamed"
+    new_name: "{{ test_custom_prop_name }}"
+    member_types:
+      - VM
+      - Cloud
+    vmm_server: "{{ scvmm_server }}"
+
+# ── Check mode: delete ──
+- name: Delete custom property in check mode
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode delete reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify check mode did not actually delete
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_check_delete
+
+- name: Assert property still exists after check mode delete
+  ansible.builtin.assert:
+    that:
+      - verify_check_delete.custom_properties | length == 1
+
+# ── Delete custom property ──
+- name: Delete custom property
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_result
+
+- name: Assert property was deleted
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+
+# ── Verify deletion with info module ──
+- name: Verify custom property is gone via info module
+  microsoft.scvmm.scvmm_custom_property_info:
+    name: "{{ test_custom_prop_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_delete
+
+- name: Assert info module returns empty for deleted property
+  ansible.builtin.assert:
+    that:
+      - verify_delete.custom_properties | length == 0
+
+# ── Absent idempotency ──
+- name: Delete already-deleted custom property
+  microsoft.scvmm.scvmm_custom_property:
+    name: "{{ test_custom_prop_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: absent_noop
+
+- name: Assert no change on absent idempotency
+  ansible.builtin.assert:
+    that:
+      - absent_noop is not changed

@@ -1,0 +1,3 @@
+minor_changes:
+  - scvmm_custom_property - new module to manage custom properties in SCVMM.
+  - scvmm_custom_property_info - new module to query custom properties in SCVMM.
