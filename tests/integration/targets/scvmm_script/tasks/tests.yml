@@ -1,0 +1,425 @@
+---
+# ── Info: get specific script by name ──
+- name: Get script by name
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: script_info
+
+- name: Assert script was found with correct properties
+  ansible.builtin.assert:
+    that:
+      - script_info.scripts | length == 1
+      - script_info.scripts[0].name == test_script_name
+      - script_info.scripts[0].id is defined
+      - script_info.scripts[0].id | length > 0
+      - script_info.scripts[0].share_path is defined
+      - script_info.scripts[0].library_server is defined
+      - script_info.scripts[0].library_server | length > 0
+      - script_info.scripts[0].enabled is defined
+      - script_info.scripts[0].owner is defined
+      - script_info.scripts[0].is_orphaned is defined
+      - script_info.scripts[0].is_orphaned == false
+
+# ── Info: get all scripts ──
+- name: Get all scripts
+  microsoft.scvmm.scvmm_script_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_scripts
+
+- name: Assert all scripts returned includes our test script
+  ansible.builtin.assert:
+    that:
+      - all_scripts.scripts | length >= 1
+      - test_script_name in (all_scripts.scripts | map(attribute='name') | list)
+
+# ── Info: non-existent script returns empty list ──
+- name: Query non-existent script
+  microsoft.scvmm.scvmm_script_info:
+    name: "NonExistent_{{ 99999 | random }}.ps1"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_script
+
+- name: Assert empty list for non-existent script
+  ansible.builtin.assert:
+    that:
+      - no_script.scripts | length == 0
+
+# ── Action: present with no changes (idempotency) ──
+- name: Set script with no property changes (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: no_change
+
+- name: Assert no change when no properties specified
+  ansible.builtin.assert:
+    that:
+      - no_change is not changed
+      - no_change.script.name == test_script_name
+
+# ── Action: update description ──
+- name: Update script description
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    description: "Ansible test script description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_desc
+
+- name: Assert description was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_desc is changed
+      - update_desc.script.description == "Ansible test script description"
+      - update_desc.diff.before is defined
+      - update_desc.diff.after is defined
+      - update_desc.diff.after.description == "Ansible test script description"
+
+# ── Action: update description idempotency ──
+- name: Update script with same description (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    description: "Ansible test script description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: desc_idempotent
+
+- name: Assert no change on description idempotency
+  ansible.builtin.assert:
+    that:
+      - desc_idempotent is not changed
+
+# ── Info: verify description via info module ──
+- name: Verify description update via info module
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_desc
+
+- name: Assert info module shows updated description
+  ansible.builtin.assert:
+    that:
+      - verify_desc.scripts[0].description == "Ansible test script description"
+
+# ── Action: update family_name individually ──
+- name: Update script family name only
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    family_name: "TestFamily"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_family
+
+- name: Assert family name was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_family is changed
+      - update_family.script.family_name == "TestFamily"
+      - update_family.diff.after.family_name == "TestFamily"
+
+- name: Update script with same family name (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    family_name: "TestFamily"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: family_idempotent
+
+- name: Assert no change on family name idempotency
+  ansible.builtin.assert:
+    that:
+      - family_idempotent is not changed
+
+# ── Action: update release individually ──
+- name: Update script release only
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    release: "1.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_release
+
+- name: Assert release was updated with diff
+  ansible.builtin.assert:
+    that:
+      - update_release is changed
+      - update_release.script.release == "1.0"
+      - update_release.diff.after.release == "1.0"
+
+- name: Update script with same release (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    release: "1.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: release_idempotent
+
+- name: Assert no change on release idempotency
+  ansible.builtin.assert:
+    that:
+      - release_idempotent is not changed
+
+# ── Info: verify all properties via info module ──
+- name: Verify all properties via info module
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_all
+
+- name: Assert all updated properties are correct
+  ansible.builtin.assert:
+    that:
+      - verify_all.scripts[0].description == "Ansible test script description"
+      - verify_all.scripts[0].family_name == "TestFamily"
+      - verify_all.scripts[0].release == "1.0"
+
+# ── Action: update multiple properties at once ──
+- name: Update description and release together
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    description: "Updated multi-property"
+    release: "2.0"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: multi_update
+
+- name: Assert multiple properties updated
+  ansible.builtin.assert:
+    that:
+      - multi_update is changed
+      - multi_update.script.description == "Updated multi-property"
+      - multi_update.script.release == "2.0"
+      - multi_update.script.family_name == "TestFamily"
+
+# ── Action: disable script ──
+- name: Disable script
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    enabled: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disable_result
+
+- name: Assert script was disabled
+  ansible.builtin.assert:
+    that:
+      - disable_result is changed
+      - disable_result.script.enabled == false
+
+# ── Action: disable idempotency ──
+- name: Disable script again (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    enabled: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: disable_idempotent
+
+- name: Assert no change on disable idempotency
+  ansible.builtin.assert:
+    that:
+      - disable_idempotent is not changed
+
+# ── Info: verify disabled state ──
+- name: Verify disabled state via info module
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_disabled
+
+- name: Assert info module shows disabled
+  ansible.builtin.assert:
+    that:
+      - verify_disabled.scripts[0].enabled == false
+
+# ── Action: re-enable script ──
+- name: Re-enable script
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    enabled: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_result
+
+- name: Assert script was re-enabled
+  ansible.builtin.assert:
+    that:
+      - enable_result is changed
+      - enable_result.script.enabled == true
+
+# ── Action: re-enable idempotency ──
+- name: Re-enable script again (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    enabled: true
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: enable_idempotent
+
+- name: Assert no change on re-enable idempotency
+  ansible.builtin.assert:
+    that:
+      - enable_idempotent is not changed
+
+# ── Info: verify re-enabled state ──
+- name: Verify re-enabled state via info module
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_enabled
+
+- name: Assert info module shows enabled
+  ansible.builtin.assert:
+    that:
+      - verify_enabled.scripts[0].enabled == true
+
+# ── Action: set owner ──
+- name: Set script owner
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    owner: "SCVMM\\Administrator"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: set_owner
+
+- name: Assert owner was set
+  ansible.builtin.assert:
+    that:
+      - set_owner.script.owner == 'SCVMM\Administrator'
+
+- name: Verify owner via info module
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_owner
+
+- name: Assert info module shows updated owner
+  ansible.builtin.assert:
+    that:
+      - verify_owner.scripts[0].owner == 'SCVMM\Administrator'
+
+- name: Set same owner again (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    owner: "SCVMM\\Administrator"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: owner_idempotent
+
+- name: Assert no change on owner idempotency
+  ansible.builtin.assert:
+    that:
+      - owner_idempotent is not changed
+
+# ── Action: check mode update ──
+- name: Update script in check mode
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description unchanged after check mode
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check
+
+- name: Assert description still has previous value
+  ansible.builtin.assert:
+    that:
+      - after_check.scripts[0].description == "Updated multi-property"
+
+# ── Action: error for non-existent script with state=present ──
+- name: Update non-existent script (should fail)
+  microsoft.scvmm.scvmm_script:
+    name: "NonExistent_{{ 99999 | random }}.ps1"
+    description: "This should fail"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: not_found_error
+  ignore_errors: true
+
+- name: Assert error for non-existent script
+  ansible.builtin.assert:
+    that:
+      - not_found_error is failed
+      - "'not found' in not_found_error.msg"
+
+# ── Action: check mode delete ──
+- name: Delete script in check mode
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_delete
+
+- name: Assert check mode reports change for delete
+  ansible.builtin.assert:
+    that:
+      - check_mode_delete is changed
+
+- name: Verify script still exists after check mode delete
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_delete
+
+- name: Assert script still present
+  ansible.builtin.assert:
+    that:
+      - after_check_delete.scripts | length == 1
+
+# ── Action: delete script ──
+- name: Remove script
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: delete_result
+
+- name: Assert script was removed with diff
+  ansible.builtin.assert:
+    that:
+      - delete_result is changed
+      - delete_result.diff.before.name == test_script_name
+      - delete_result.diff.after == {}
+
+# ── Action: verify deletion via info module ──
+- name: Verify script removed via info module
+  microsoft.scvmm.scvmm_script_info:
+    name: "{{ test_script_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_deleted
+
+- name: Assert script no longer exists
+  ansible.builtin.assert:
+    that:
+      - verify_deleted.scripts | length == 0
+
+# ── Action: absent idempotency ──
+- name: Remove already-deleted script (idempotency)
+  microsoft.scvmm.scvmm_script:
+    name: "{{ test_script_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: delete_idempotent
+
+- name: Assert no change when removing non-existent
+  ansible.builtin.assert:
+    that:
+      - delete_idempotent is not changed
