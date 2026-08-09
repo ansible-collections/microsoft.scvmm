@@ -1,0 +1,127 @@
+---
+- name: Define test variables
+  set_fact:
+    test_vm: "AnsibleTest_Inventory_{{ 99999 | random }}"
+    test_ln_name: "AnsibleTest_Inv_LN_{{ 99999 | random }}"
+    test_vmnet_name: "AnsibleTest_Inv_VMNet_{{ 99999 | random }}"
+    test_cloud_name: "AnsibleTest_Inv_Cloud_{{ 99999 | random }}"
+
+- block:
+    - name: Setup - Create logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Setup - Create VM network
+      microsoft.scvmm.scvmm_vm_network:
+        name: "{{ test_vmnet_name }}"
+        logical_network: "{{ test_ln_name }}"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Setup - Create cloud for filter testing
+      microsoft.scvmm.scvmm_cloud:
+        name: "{{ test_cloud_name }}"
+        host_group: "All Hosts"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Setup - Create test VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_vm }}"
+        template: "{{ test_vm_template }}"
+        vm_host: "{{ test_vm_host }}"
+        vmm_server: "{{ scvmm_server }}"
+        state: present
+
+    - name: Setup - Add network adapter to test VM
+      microsoft.scvmm.scvmm_network_adapter:
+        vm_name: "{{ test_vm }}"
+        vm_network: "{{ test_vmnet_name }}"
+        state: present
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Setup - Move VM into cloud for filter testing
+      ansible.windows.win_powershell:
+        script: |
+          $vm = Get-SCVirtualMachine -VMMServer "{{ scvmm_server }}" -Name "{{ test_vm }}"
+          $cloud = Get-SCCloud -VMMServer "{{ scvmm_server }}" -Name "{{ test_cloud_name }}"
+          Set-SCVirtualMachine -VM $vm -Cloud $cloud
+
+    - name: Verify - Confirm VM exists via scvmm_vm_info
+      microsoft.scvmm.scvmm_vm_info:
+        name: "{{ test_vm }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: setup_vm_info
+
+    - name: Verify - Assert VM was created correctly
+      assert:
+        that:
+          - setup_vm_info.virtual_machines | length == 1
+          - setup_vm_info.virtual_machines[0].name == test_vm
+          - setup_vm_info.virtual_machines[0].cloud == test_cloud_name
+
+    - name: Verify - Confirm network adapter exists via scvmm_network_adapter_info
+      microsoft.scvmm.scvmm_network_adapter_info:
+        vm_name: "{{ test_vm }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: setup_nic_info
+
+    - name: Verify - Assert network adapter was created correctly
+      assert:
+        that:
+          - setup_nic_info.network_adapters | length > 0
+          - setup_nic_info.network_adapters | selectattr('vm_network', 'equalto', test_vmnet_name) | list | length > 0
+
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove network adapter
+      microsoft.scvmm.scvmm_network_adapter:
+        vm_name: "{{ test_vm }}"
+        vm_network: "{{ test_vmnet_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove test VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove cloud
+      microsoft.scvmm.scvmm_cloud:
+        name: "{{ test_cloud_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove VM network
+      microsoft.scvmm.scvmm_vm_network:
+        name: "{{ test_vmnet_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Remove logical network
+      microsoft.scvmm.scvmm_logical_network:
+        name: "{{ test_ln_name }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate VM removed
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ test_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      assert:
+        that:
+          - teardown_validate.changed == false
