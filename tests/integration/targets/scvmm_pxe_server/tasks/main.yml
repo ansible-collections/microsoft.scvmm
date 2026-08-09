@@ -1,0 +1,56 @@
+---
+- name: Define test variables
+  ansible.builtin.set_fact:
+    test_pxe_computer: "{{ scvmm_server }}"
+
+- name: Ensure WDS is installed and running
+  ansible.windows.win_powershell:
+    script: |
+      param($ComputerName)
+      $feature = Get-WindowsFeature WDS
+      if (-not $feature.Installed) {
+          $Ansible.Failed = $true
+          $Ansible.Result = "WDS role is not installed on $ComputerName"
+          return
+      }
+      $svc = Get-Service WDSServer -ErrorAction SilentlyContinue
+      if (-not $svc -or $svc.Status -ne 'Running') {
+          Start-Service WDSServer -ErrorAction SilentlyContinue
+          Start-Sleep -Seconds 5
+          $svc = Get-Service WDSServer
+      }
+      $Ansible.Result = "WDS is installed and service is $($svc.Status)"
+    parameters:
+      ComputerName: "{{ test_pxe_computer }}"
+  register: wds_check
+
+- name: Ensure no PXE server registered before tests
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  ignore_errors: true
+
+- block:
+    - name: Run tests
+      ansible.builtin.include_tasks: tests.yml
+
+  always:
+    - name: Teardown - Remove PXE server from VMM
+      microsoft.scvmm.scvmm_pxe_server:
+        computer_name: "{{ test_pxe_computer }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      ignore_errors: true
+
+    - name: Teardown - Validate PXE server removed
+      microsoft.scvmm.scvmm_pxe_server:
+        computer_name: "{{ test_pxe_computer }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+      register: teardown_validate
+
+    - name: Teardown - Assert server is clean
+      ansible.builtin.assert:
+        that:
+          - teardown_validate.changed == false

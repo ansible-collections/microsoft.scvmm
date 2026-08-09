@@ -1,0 +1,198 @@
+---
+# ── Info: list all PXE servers ──
+- name: Get all PXE servers before test
+  microsoft.scvmm.scvmm_pxe_server_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: initial_pxe
+
+- name: Assert PXE server list is returned
+  ansible.builtin.assert:
+    that:
+      - initial_pxe.pxe_servers is defined
+      - initial_pxe.pxe_servers is sequence
+
+# ── Info: query non-existent PXE server returns empty ──
+- name: Query non-existent PXE server
+  microsoft.scvmm.scvmm_pxe_server_info:
+    computer_name: "NonExistent.example.com"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_pxe
+
+- name: Assert empty list for non-existent PXE server
+  ansible.builtin.assert:
+    that:
+      - no_pxe.pxe_servers | length == 0
+
+# ── Action: check mode register ──
+- name: Register PXE server in check mode
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    run_as_account: "{{ test_run_as_account }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_add
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_add is changed
+
+- name: Verify PXE server not actually registered after check mode
+  microsoft.scvmm.scvmm_pxe_server_info:
+    computer_name: "{{ test_pxe_computer }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_add
+
+- name: Assert PXE server still not registered
+  ansible.builtin.assert:
+    that:
+      - after_check_add.pxe_servers | length == 0
+
+# ── Action: register PXE server ──
+- name: Register PXE server
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    run_as_account: "{{ test_run_as_account }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: add_result
+
+- name: Assert PXE server was registered
+  ansible.builtin.assert:
+    that:
+      - add_result is changed
+      - add_result.pxe_server is defined
+      - add_result.pxe_server.id is defined
+      - add_result.pxe_server.id | length > 0
+      - add_result.pxe_server.name is defined
+      - >-
+        add_result.pxe_server.name == test_pxe_computer or
+        add_result.pxe_server.managed_computer == test_pxe_computer
+      - add_result.diff.before == {}
+      - add_result.diff.after is defined
+
+# ── Info: verify via info module ──
+- name: Get PXE server by computer name
+  microsoft.scvmm.scvmm_pxe_server_info:
+    computer_name: "{{ test_pxe_computer }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: pxe_info
+
+- name: Assert PXE server found with correct properties
+  ansible.builtin.assert:
+    that:
+      - pxe_info.pxe_servers | length == 1
+      - pxe_info.pxe_servers[0].id is defined
+      - pxe_info.pxe_servers[0].id | length > 0
+      - pxe_info.pxe_servers[0].name is defined
+      - pxe_info.pxe_servers[0].managed_computer is defined
+
+# ── Info: get all PXE servers ──
+- name: Get all PXE servers
+  microsoft.scvmm.scvmm_pxe_server_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_pxe
+
+- name: Assert all PXE servers includes our test server
+  ansible.builtin.assert:
+    that:
+      - all_pxe.pxe_servers | length >= 1
+
+# ── Action: register same PXE server again (idempotency) ──
+- name: Register same PXE server again (idempotency)
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    run_as_account: "{{ test_run_as_account }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_add
+
+- name: Assert no change on idempotent add
+  ansible.builtin.assert:
+    that:
+      - idempotent_add is not changed
+      - idempotent_add.pxe_server is defined
+      - idempotent_add.pxe_server.id is defined
+
+# ── Action: check mode remove ──
+- name: Remove PXE server in check mode
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_remove
+
+- name: Assert check mode reports change for remove
+  ansible.builtin.assert:
+    that:
+      - check_mode_remove is changed
+
+- name: Verify PXE server still present after check mode remove
+  microsoft.scvmm.scvmm_pxe_server_info:
+    computer_name: "{{ test_pxe_computer }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_remove
+
+- name: Assert PXE server still registered
+  ansible.builtin.assert:
+    that:
+      - after_check_remove.pxe_servers | length == 1
+
+# ── Action: remove PXE server ──
+- name: Remove PXE server
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: remove_result
+
+- name: Assert PXE server was removed
+  ansible.builtin.assert:
+    that:
+      - remove_result is changed
+      - remove_result.diff.before is defined
+      - remove_result.diff.after == {}
+
+# ── Info: verify removal via info module ──
+- name: Verify PXE server removed via info module
+  microsoft.scvmm.scvmm_pxe_server_info:
+    computer_name: "{{ test_pxe_computer }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_removed
+
+- name: Assert PXE server no longer exists
+  ansible.builtin.assert:
+    that:
+      - verify_removed.pxe_servers | length == 0
+
+# ── Action: remove already-removed PXE server (idempotency) ──
+- name: Remove already-removed PXE server (idempotency)
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_remove
+
+- name: Assert no change on idempotent remove
+  ansible.builtin.assert:
+    that:
+      - idempotent_remove is not changed
+
+# ── Action: re-register for teardown verification ──
+- name: Re-register PXE server for teardown
+  microsoft.scvmm.scvmm_pxe_server:
+    computer_name: "{{ test_pxe_computer }}"
+    run_as_account: "{{ test_run_as_account }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: re_add
+
+- name: Assert re-registration succeeded
+  ansible.builtin.assert:
+    that:
+      - re_add is changed
+      - re_add.pxe_server.id is defined
