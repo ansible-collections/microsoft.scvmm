@@ -1,0 +1,388 @@
+---
+# ── Info: list all profiles ──
+- name: Get all profiles before test
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: initial_profiles
+
+- name: Assert profile list is returned
+  ansible.builtin.assert:
+    that:
+      - initial_profiles.physical_computer_profiles is defined
+      - initial_profiles.physical_computer_profiles is sequence
+
+# ── Info: query non-existent profile ──
+- name: Query non-existent profile
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "NonExistent-Profile"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_profile
+
+- name: Assert empty list for non-existent profile
+  ansible.builtin.assert:
+    that:
+      - no_profile.physical_computer_profiles | length == 0
+
+# ── Action: check mode create ──
+- name: Create profile in check mode
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    description: "Ansible test profile"
+    virtual_hard_disk: "{{ test_vhd_name }}"
+    local_admin_password: "{{ test_local_admin_password }}"
+    join_workgroup: true
+    use_as_vm_host: true
+    full_name: "Ansible Test"
+    organization_name: "Test Org"
+    time_zone: 35
+    bypass_vhd_conversion: true
+    vm_paths: "C:\\VMs"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_create
+
+- name: Assert check mode reports change
+  ansible.builtin.assert:
+    that:
+      - check_mode_create is changed
+      - check_mode_create.physical_computer_profile is defined
+      - check_mode_create.physical_computer_profile.name == test_profile_name
+
+- name: Verify profile not actually created after check mode
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_create
+
+- name: Assert profile still does not exist
+  ansible.builtin.assert:
+    that:
+      - after_check_create.physical_computer_profiles | length == 0
+
+# ── Action: create profile with all params ──
+- name: Create workgroup physical computer profile
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    description: "Ansible test profile"
+    virtual_hard_disk: "{{ test_vhd_name }}"
+    local_admin_password: "{{ test_local_admin_password }}"
+    join_workgroup: true
+    use_as_vm_host: true
+    full_name: "Ansible Test"
+    organization_name: "Test Org"
+    time_zone: 35
+    bypass_vhd_conversion: true
+    vm_paths: "C:\\VMs"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: create_result
+
+- name: Assert profile was created with all properties
+  ansible.builtin.assert:
+    that:
+      - create_result is changed
+      - create_result.physical_computer_profile is defined
+      - create_result.physical_computer_profile.id is defined
+      - create_result.physical_computer_profile.id | length > 0
+      - create_result.physical_computer_profile.name == test_profile_name
+      - create_result.physical_computer_profile.description == "Ansible test profile"
+      - create_result.physical_computer_profile.full_name == "Ansible Test"
+      - create_result.physical_computer_profile.organization_name == "Test Org"
+      - create_result.physical_computer_profile.os_boot_vhd == test_vhd_name
+      - create_result.physical_computer_profile.bypass_vhd_conversion == true
+      - create_result.physical_computer_profile.vm_paths == "C:\\VMs"
+      - create_result.diff.before == {}
+      - create_result.diff.after is defined
+
+# ── Info: verify via info module ──
+- name: Get profile by name
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: profile_info
+
+- name: Assert profile found with correct properties
+  ansible.builtin.assert:
+    that:
+      - profile_info.physical_computer_profiles | length == 1
+      - profile_info.physical_computer_profiles[0].id is defined
+      - profile_info.physical_computer_profiles[0].id | length > 0
+      - profile_info.physical_computer_profiles[0].name == test_profile_name
+      - profile_info.physical_computer_profiles[0].description == "Ansible test profile"
+      - profile_info.physical_computer_profiles[0].full_name == "Ansible Test"
+      - profile_info.physical_computer_profiles[0].organization_name == "Test Org"
+      - profile_info.physical_computer_profiles[0].os_boot_vhd == test_vhd_name
+      - profile_info.physical_computer_profiles[0].bypass_vhd_conversion == true
+      - profile_info.physical_computer_profiles[0].vm_paths == "C:\\VMs"
+
+# ── Info: get all profiles ──
+- name: Get all profiles
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_profiles
+
+- name: Assert all profiles includes test profile
+  ansible.builtin.assert:
+    that:
+      - all_profiles.physical_computer_profiles | length >= 1
+
+# ── Action: idempotent create ──
+- name: Create same profile again (idempotency)
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    description: "Ansible test profile"
+    full_name: "Ansible Test"
+    organization_name: "Test Org"
+    bypass_vhd_conversion: true
+    vm_paths: "C:\\VMs"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_create
+
+- name: Assert no change on idempotent create
+  ansible.builtin.assert:
+    that:
+      - idempotent_create is not changed
+      - idempotent_create.physical_computer_profile is defined
+      - idempotent_create.physical_computer_profile.id is defined
+
+# ── Action: update description ──
+- name: Update profile description
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    description: "Updated ansible test profile"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_desc
+
+- name: Assert description was updated
+  ansible.builtin.assert:
+    that:
+      - update_desc is changed
+      - update_desc.physical_computer_profile.description == "Updated ansible test profile"
+      - update_desc.diff.before.description == "Ansible test profile"
+      - update_desc.diff.after.description == "Updated ansible test profile"
+
+# ── Action: update full_name ──
+- name: Update profile full_name
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    full_name: "Updated Admin"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_full_name
+
+- name: Assert full_name was updated
+  ansible.builtin.assert:
+    that:
+      - update_full_name is changed
+      - update_full_name.physical_computer_profile.full_name == "Updated Admin"
+      - update_full_name.diff.before.full_name == "Ansible Test"
+      - update_full_name.diff.after.full_name == "Updated Admin"
+
+# ── Action: update organization_name ──
+- name: Update profile organization_name
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    organization_name: "Updated Org"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_org
+
+- name: Assert organization_name was updated
+  ansible.builtin.assert:
+    that:
+      - update_org is changed
+      - update_org.physical_computer_profile.organization_name == "Updated Org"
+      - update_org.diff.before.organization_name == "Test Org"
+      - update_org.diff.after.organization_name == "Updated Org"
+
+# ── Action: update bypass_vhd_conversion ──
+- name: Update bypass_vhd_conversion to false
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    bypass_vhd_conversion: false
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_bypass
+
+- name: Assert bypass_vhd_conversion was updated
+  ansible.builtin.assert:
+    that:
+      - update_bypass is changed
+      - update_bypass.physical_computer_profile.bypass_vhd_conversion == false
+      - update_bypass.diff.before.bypass_vhd_conversion == true
+      - update_bypass.diff.after.bypass_vhd_conversion == false
+
+# ── Action: update vm_paths ──
+- name: Update vm_paths
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    vm_paths: "D:\\VirtualMachines"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: update_vm_paths
+
+- name: Assert vm_paths was updated
+  ansible.builtin.assert:
+    that:
+      - update_vm_paths is changed
+      - update_vm_paths.physical_computer_profile.vm_paths == "D:\\VirtualMachines"
+      - update_vm_paths.diff.before.vm_paths == "C:\\VMs"
+      - update_vm_paths.diff.after.vm_paths == "D:\\VirtualMachines"
+
+# ── Info: verify all updates via info ──
+- name: Verify all updates via info module
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: updated_info
+
+- name: Assert all updated properties are correct
+  ansible.builtin.assert:
+    that:
+      - updated_info.physical_computer_profiles[0].description == "Updated ansible test profile"
+      - updated_info.physical_computer_profiles[0].full_name == "Updated Admin"
+      - updated_info.physical_computer_profiles[0].organization_name == "Updated Org"
+      - updated_info.physical_computer_profiles[0].bypass_vhd_conversion == false
+      - updated_info.physical_computer_profiles[0].vm_paths == "D:\\VirtualMachines"
+
+# ── Action: check mode update ──
+- name: Update description in check mode
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    description: "Check mode description"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_update
+
+- name: Assert check mode reports change for update
+  ansible.builtin.assert:
+    that:
+      - check_mode_update is changed
+
+- name: Verify description not changed after check mode update
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_update
+
+- name: Assert description still has real value
+  ansible.builtin.assert:
+    that:
+      - after_check_update.physical_computer_profiles[0].description == "Updated ansible test profile"
+
+# ── Action: rename profile ──
+- name: Rename profile
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    new_name: "{{ test_profile_name }}-Renamed"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: rename_result
+
+- name: Assert rename succeeded
+  ansible.builtin.assert:
+    that:
+      - rename_result is changed
+      - rename_result.physical_computer_profile.name == test_profile_name + "-Renamed"
+
+- name: Verify renamed profile via info
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "{{ test_profile_name }}-Renamed"
+    vmm_server: "{{ scvmm_server }}"
+  register: renamed_info
+
+- name: Assert renamed profile exists
+  ansible.builtin.assert:
+    that:
+      - renamed_info.physical_computer_profiles | length == 1
+      - renamed_info.physical_computer_profiles[0].name == test_profile_name + "-Renamed"
+
+# ── Action: rename back for further tests ──
+- name: Rename profile back
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}-Renamed"
+    new_name: "{{ test_profile_name }}"
+    state: present
+    vmm_server: "{{ scvmm_server }}"
+  register: rename_back
+
+- name: Assert rename back succeeded
+  ansible.builtin.assert:
+    that:
+      - rename_back is changed
+
+# ── Action: check mode remove ──
+- name: Remove profile in check mode
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_remove
+
+- name: Assert check mode reports change for remove
+  ansible.builtin.assert:
+    that:
+      - check_mode_remove is changed
+
+- name: Verify profile still present after check mode remove
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: after_check_remove
+
+- name: Assert profile still exists
+  ansible.builtin.assert:
+    that:
+      - after_check_remove.physical_computer_profiles | length == 1
+
+# ── Action: remove profile ──
+- name: Remove profile
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  diff: true
+  register: remove_result
+
+- name: Assert profile was removed
+  ansible.builtin.assert:
+    that:
+      - remove_result is changed
+      - remove_result.diff.before is defined
+      - remove_result.diff.after == {}
+
+# ── Info: verify removal ──
+- name: Verify profile removed via info
+  microsoft.scvmm.scvmm_physical_computer_profile_info:
+    name: "{{ test_profile_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: verify_removed
+
+- name: Assert profile no longer exists
+  ansible.builtin.assert:
+    that:
+      - verify_removed.physical_computer_profiles | length == 0
+
+# ── Action: idempotent remove ──
+- name: Remove already-removed profile (idempotency)
+  microsoft.scvmm.scvmm_physical_computer_profile:
+    name: "{{ test_profile_name }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: idempotent_remove
+
+- name: Assert no change on idempotent remove
+  ansible.builtin.assert:
+    that:
+      - idempotent_remove is not changed
