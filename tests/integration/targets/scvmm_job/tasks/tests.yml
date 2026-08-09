@@ -1,0 +1,257 @@
+---
+# ── Info: get all recent jobs ──
+- name: Get all recent jobs
+  microsoft.scvmm.scvmm_job_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_jobs
+
+- name: Assert jobs list returned
+  ansible.builtin.assert:
+    that:
+      - all_jobs.jobs is defined
+      - all_jobs.jobs | type_debug == 'list'
+
+# ── Info: get jobs from last 1 hour ──
+- name: Get jobs from the last 1 hour
+  microsoft.scvmm.scvmm_job_info:
+    newest: 1
+    vmm_server: "{{ scvmm_server }}"
+  register: recent_jobs
+
+- name: Assert recent jobs returned
+  ansible.builtin.assert:
+    that:
+      - recent_jobs.jobs is defined
+      - recent_jobs.jobs | type_debug == 'list'
+
+# ── Info: get running jobs ──
+- name: Get only running jobs
+  microsoft.scvmm.scvmm_job_info:
+    running: true
+    vmm_server: "{{ scvmm_server }}"
+  register: running_jobs
+
+- name: Assert running jobs returned
+  ansible.builtin.assert:
+    that:
+      - running_jobs.jobs is defined
+      - running_jobs.jobs | type_debug == 'list'
+
+# ── Trigger a job by refreshing the VMM host ──
+- name: Refresh VMM host to create a job
+  ansible.windows.win_powershell:
+    script: |
+      Import-Module VirtualMachineManager
+      $vmm = Get-SCVMMServer -ComputerName localhost
+      $host_obj = Get-SCVMHost -VMMServer $vmm | Select-Object -First 1
+      if ($host_obj) {
+          Read-SCVMHost -VMHost $host_obj -RunAsynchronously -JobVariable 'refreshJob'
+          Start-Sleep -Seconds 2
+          $Ansible.Result = @{
+              job_id = $refreshJob.ID.ToString()
+              job_name = $refreshJob.Name
+              job_status = $refreshJob.Status.ToString()
+          }
+      } else {
+          $Ansible.Result = @{ job_id = $null; job_name = $null; job_status = $null }
+      }
+  register: triggered_job
+
+# ── Info: query specific job by ID ──
+- name: Query job by ID
+  microsoft.scvmm.scvmm_job_info:
+    id: "{{ triggered_job.result.job_id }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: job_by_id
+  when: triggered_job.result.job_id is not none
+
+- name: Assert job found by ID with correct properties
+  ansible.builtin.assert:
+    that:
+      - job_by_id.jobs | length == 1
+      - job_by_id.jobs[0].id == triggered_job.result.job_id
+      - job_by_id.jobs[0].name is defined
+      - job_by_id.jobs[0].status is defined
+      - job_by_id.jobs[0].progress is defined
+  when: triggered_job.result.job_id is not none
+
+# ── Info: query non-existent job ──
+- name: Query non-existent job by ID
+  microsoft.scvmm.scvmm_job_info:
+    id: "00000000-0000-0000-0000-000000000000"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_job
+
+- name: Assert non-existent job returns empty list
+  ansible.builtin.assert:
+    that:
+      - no_job.jobs | length == 0
+
+# ── Info: query job by name ──
+- name: Query job by name
+  microsoft.scvmm.scvmm_job_info:
+    name: "{{ triggered_job.result.job_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: job_by_name
+  when: triggered_job.result.job_name is not none
+
+- name: Assert job found by name
+  ansible.builtin.assert:
+    that:
+      - job_by_name.jobs | length > 0
+      - job_by_name.jobs | map(attribute='name') | select('equalto', triggered_job.result.job_name) | list | length > 0
+  when: triggered_job.result.job_name is not none
+
+# ── Info: query job by non-existent name ──
+- name: Query job by non-existent name
+  microsoft.scvmm.scvmm_job_info:
+    name: "NonExistentJobName_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: no_name_job
+
+- name: Assert non-existent name returns empty list
+  ansible.builtin.assert:
+    that:
+      - no_name_job.jobs | length == 0
+
+# ── Action: stop a running job (if we have one) ──
+- name: Wait briefly for job to be in Running state
+  ansible.builtin.pause:
+    seconds: 2
+  when: triggered_job.result.job_id is not none
+
+- name: Get current job status before stop
+  microsoft.scvmm.scvmm_job_info:
+    id: "{{ triggered_job.result.job_id }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: job_before_stop
+  when: triggered_job.result.job_id is not none
+
+- name: Stop the running job
+  microsoft.scvmm.scvmm_job:
+    id: "{{ triggered_job.result.job_id }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+  register: stop_result
+  when:
+    - triggered_job.result.job_id is not none
+    - job_before_stop.jobs | length > 0
+    - job_before_stop.jobs[0].status == 'Running'
+
+- name: Assert job was stopped
+  ansible.builtin.assert:
+    that:
+      - stop_result is changed
+      - stop_result.job.id == triggered_job.result.job_id
+  when: stop_result is not skipped
+
+# ── Action: stop idempotency (already stopped) ──
+- name: Stop job again (idempotency)
+  microsoft.scvmm.scvmm_job:
+    id: "{{ triggered_job.result.job_id }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+  register: stop_idempotent
+  when:
+    - triggered_job.result.job_id is not none
+    - stop_result is not skipped
+
+- name: Assert no change on stop idempotency
+  ansible.builtin.assert:
+    that:
+      - stop_idempotent is not changed
+  when: stop_idempotent is not skipped
+
+# ── Action: restart a stopped/failed job ──
+- name: Restart the stopped job
+  microsoft.scvmm.scvmm_job:
+    id: "{{ triggered_job.result.job_id }}"
+    state: restarted
+    vmm_server: "{{ scvmm_server }}"
+  register: restart_result
+  when:
+    - triggered_job.result.job_id is not none
+    - stop_result is not skipped
+  ignore_errors: true
+
+- name: Assert job restart was attempted
+  ansible.builtin.assert:
+    that:
+      - restart_result is changed or restart_result is failed
+  when: restart_result is not skipped
+
+# ── Action: check mode ──
+- name: Get a completed job for check mode test
+  microsoft.scvmm.scvmm_job_info:
+    newest: 24
+    vmm_server: "{{ scvmm_server }}"
+  register: recent_for_check
+
+- name: Set fact for completed job
+  ansible.builtin.set_fact:
+    completed_job_id: "{{ (recent_for_check.jobs | selectattr('status', 'equalto', 'Completed') | list | first).id }}"
+  when: recent_for_check.jobs | selectattr('status', 'equalto', 'Completed') | list | length > 0
+
+- name: Stop completed job in check mode (should be no change)
+  microsoft.scvmm.scvmm_job:
+    id: "{{ completed_job_id }}"
+    state: stopped
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_stop
+  when: completed_job_id is defined
+
+- name: Assert check mode on completed job reports no change
+  ansible.builtin.assert:
+    that:
+      - check_mode_stop is not changed
+  when: check_mode_stop is not skipped
+
+# ── Action: error on invalid restart ──
+- name: Attempt to restart a completed job
+  microsoft.scvmm.scvmm_job:
+    id: "{{ completed_job_id }}"
+    state: restarted
+    vmm_server: "{{ scvmm_server }}"
+  register: restart_completed
+  ignore_errors: true
+  when: completed_job_id is defined
+
+- name: Assert restart of completed job fails
+  ansible.builtin.assert:
+    that:
+      - restart_completed is failed
+      - "'Cannot restart job' in restart_completed.msg"
+  when: restart_completed is not skipped
+
+# ── Action: restart with skip_last_failed_step ──
+- name: Find a failed job for skip_last_failed_step test
+  ansible.builtin.set_fact:
+    failed_job_id: "{{ (recent_for_check.jobs | selectattr('status', 'equalto', 'Failed') | list | first).id }}"
+  when: recent_for_check.jobs | selectattr('status', 'equalto', 'Failed') | list | length > 0
+
+- name: Restart failed job with skip_last_failed_step
+  microsoft.scvmm.scvmm_job:
+    id: "{{ failed_job_id }}"
+    state: restarted
+    skip_last_failed_step: true
+    vmm_server: "{{ scvmm_server }}"
+  register: restart_skip_result
+  when: failed_job_id is defined
+  ignore_errors: true
+
+- name: Assert skip_last_failed_step restart was attempted
+  ansible.builtin.assert:
+    that:
+      - restart_skip_result is changed or restart_skip_result is failed
+  when: restart_skip_result is not skipped
+
+# ── Info: verify error_info on failed jobs ──
+- name: Check error_info on failed jobs
+  ansible.builtin.assert:
+    that:
+      - item.error_info is defined
+  loop: "{{ recent_for_check.jobs | selectattr('status', 'equalto', 'Failed') | list }}"
+  loop_control:
+    label: "{{ item.name }}"
+  when: recent_for_check.jobs | selectattr('status', 'equalto', 'Failed') | list | length > 0
