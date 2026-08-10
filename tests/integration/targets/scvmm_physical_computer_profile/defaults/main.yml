@@ -1,0 +1,6 @@
+---
+scvmm_server: WIN-5UL8TNLBCNF.scvmm.local
+test_profile_name: "AnsibleTest-Profile"
+test_vhd_name: "Blank Disk - Small.vhd"
+test_local_admin_password: "AnsibleTest!Pass123"
+test_owner: "SCVMM\\Administrator"
