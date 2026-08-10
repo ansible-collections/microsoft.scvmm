@@ -1,0 +1,157 @@
+---
+# ── Query all VMs ──
+- name: Get full inventory
+  microsoft.scvmm.scvmm_inventory_info:
+    vmm_server: "{{ scvmm_server }}"
+  register: all_inventory
+
+- name: Assert all inventory returned and module reports no change
+  assert:
+    that:
+      - all_inventory is not changed
+      - all_inventory.virtual_machines is defined
+      - all_inventory.virtual_machines | length > 0
+
+# ── Query by name ──
+- name: Get inventory for specific VM
+  microsoft.scvmm.scvmm_inventory_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_name
+
+- name: Assert query by name returns expected data with all fields
+  assert:
+    that:
+      - by_name is not changed
+      - by_name.virtual_machines | length == 1
+      - by_name.virtual_machines[0].name == test_vm
+      - by_name.virtual_machines[0].id is defined
+      - by_name.virtual_machines[0].id | length > 0
+      - by_name.virtual_machines[0].status is defined
+      - by_name.virtual_machines[0].host_name is defined
+      - by_name.virtual_machines[0].host_group is defined
+      - by_name.virtual_machines[0].cloud == test_cloud_name
+      - "'owner' in by_name.virtual_machines[0]"
+      - by_name.virtual_machines[0].cpu_count is defined
+      - by_name.virtual_machines[0].cpu_count > 0
+      - by_name.virtual_machines[0].memory_mb is defined
+      - by_name.virtual_machines[0].memory_mb > 0
+      - by_name.virtual_machines[0].ipv4_addresses is defined
+      - by_name.virtual_machines[0].ipv4_addresses is sequence
+      - by_name.virtual_machines[0].network_adapters is defined
+      - by_name.virtual_machines[0].network_adapters is sequence
+
+# ── Network adapter enrichment ──
+- name: Assert network adapters are populated
+  assert:
+    that:
+      - by_name.virtual_machines[0].network_adapters | length > 0
+
+- name: Assert network adapter fields have expected structure
+  assert:
+    that:
+      - item.name is defined
+      - "'mac_address' in item"
+      - item.vm_network is defined
+      - item.vm_network == test_vmnet_name
+      - item.ipv4_addresses is defined
+      - item.ipv4_addresses is sequence
+  loop: "{{ by_name.virtual_machines[0].network_adapters }}"
+
+# ── Test VM appears in all inventory ──
+- name: Assert test VM appears in full inventory
+  assert:
+    that:
+      - test_vm in (all_inventory.virtual_machines | map(attribute='name') | list)
+
+# ── Filter by cloud ──
+- name: Get inventory filtered by cloud
+  microsoft.scvmm.scvmm_inventory_info:
+    cloud: "{{ test_cloud_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_cloud
+
+- name: Assert cloud filter returns test VM
+  assert:
+    that:
+      - by_cloud is not changed
+      - by_cloud.virtual_machines | length > 0
+      - test_vm in (by_cloud.virtual_machines | map(attribute='name') | list)
+
+# ── Filter by status ──
+- name: Get inventory filtered by PowerOff status
+  microsoft.scvmm.scvmm_inventory_info:
+    status: PowerOff
+    vmm_server: "{{ scvmm_server }}"
+  register: poweroff_vms
+
+- name: Assert status filter returns test VM and only PowerOff VMs
+  assert:
+    that:
+      - poweroff_vms is not changed
+      - poweroff_vms.virtual_machines | length > 0
+      - test_vm in (poweroff_vms.virtual_machines | map(attribute='name') | list)
+      - poweroff_vms.virtual_machines | map(attribute='status') | unique | list == ['PowerOff']
+
+# ── Filter by host group ──
+- name: Get inventory filtered by host group
+  microsoft.scvmm.scvmm_inventory_info:
+    host_group: "All Hosts"
+    vmm_server: "{{ scvmm_server }}"
+  register: by_host_group
+
+- name: Assert host group filter returns results including test VM
+  assert:
+    that:
+      - by_host_group is not changed
+      - by_host_group.virtual_machines | length > 0
+      - test_vm in (by_host_group.virtual_machines | map(attribute='name') | list)
+
+# ── Query non-existent VM ──
+- name: Get inventory for non-existent VM
+  microsoft.scvmm.scvmm_inventory_info:
+    name: "NonExistentVM_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: missing_vm
+
+- name: Assert no VMs returned for non-existent name
+  assert:
+    that:
+      - missing_vm is not changed
+      - missing_vm.virtual_machines | length == 0
+
+# ── Check mode ──
+- name: Get inventory in check mode
+  microsoft.scvmm.scvmm_inventory_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_result
+
+- name: Assert check mode returns same data and no change
+  assert:
+    that:
+      - check_mode_result is not changed
+      - check_mode_result.virtual_machines | length == 1
+      - check_mode_result.virtual_machines[0].name == test_vm
+
+# ── Stability (idempotency) ──
+- name: Get inventory again for stability check
+  microsoft.scvmm.scvmm_inventory_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: second_query
+
+- name: Assert repeated query returns identical data
+  assert:
+    that:
+      - second_query is not changed
+      - second_query.virtual_machines | length == 1
+      - second_query.virtual_machines[0].id == by_name.virtual_machines[0].id
+      - second_query.virtual_machines[0].name == by_name.virtual_machines[0].name
+      - second_query.virtual_machines[0].status == by_name.virtual_machines[0].status
+      - second_query.virtual_machines[0].host_name == by_name.virtual_machines[0].host_name
+      - second_query.virtual_machines[0].host_group == by_name.virtual_machines[0].host_group
+      - second_query.virtual_machines[0].cpu_count == by_name.virtual_machines[0].cpu_count
+      - second_query.virtual_machines[0].memory_mb == by_name.virtual_machines[0].memory_mb
+      - second_query.virtual_machines[0].network_adapters | length == by_name.virtual_machines[0].network_adapters | length
