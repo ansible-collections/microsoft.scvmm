@@ -267,3 +267,87 @@ releases:
     release_date: '2026-08-02'
   1.0.1:
     release_date: '2026-08-06'
+  1.1.0:
+    changes:
+      release_summary: Added new modules for bare metal provisioning, inventory, jobs,
+        servicing windows, custom properties, and library management.
+    fragments:
+      - v1.1.0.yml
+    modules:
+      - description: Manage update baselines in System Center Virtual Machine Manager.
+        name: scvmm_baseline
+        namespace: ''
+      - description: Query update baselines in System Center Virtual Machine Manager.
+        name: scvmm_baseline_info
+        namespace: ''
+      - description: Query compliance status of managed computers in SCVMM.
+        name: scvmm_compliance_info
+        namespace: ''
+      - description: Start a compliance scan on a managed computer in SCVMM.
+        name: scvmm_compliance_scan
+        namespace: ''
+      - description: Manage custom properties in System Center Virtual Machine Manager.
+        name: scvmm_custom_property
+        namespace: ''
+      - description: Query custom properties in System Center Virtual Machine Manager.
+        name: scvmm_custom_property_info
+        namespace: ''
+      - description: Manage custom resources in the SCVMM library.
+        name: scvmm_custom_resource
+        namespace: ''
+      - description: Query custom resources in the SCVMM library.
+        name: scvmm_custom_resource_info
+        namespace: ''
+      - description: Retrieve SCVMM managed infrastructure inventory.
+        name: scvmm_inventory_info
+        namespace: ''
+      - description: Manage ISO images in the SCVMM library.
+        name: scvmm_iso
+        namespace: ''
+      - description: Query ISO images in the SCVMM library.
+        name: scvmm_iso_info
+        namespace: ''
+      - description: Manage SCVMM job state.
+        name: scvmm_job
+        namespace: ''
+      - description: Query jobs in System Center Virtual Machine Manager.
+        name: scvmm_job_info
+        namespace: ''
+      - description: Manage library shares in System Center Virtual Machine Manager.
+        name: scvmm_library_share
+        namespace: ''
+      - description: Query library shares in System Center Virtual Machine Manager.
+        name: scvmm_library_share_info
+        namespace: ''
+      - description: Manage physical computer profiles in System Center Virtual Machine
+          Manager.
+        name: scvmm_physical_computer_profile
+        namespace: ''
+      - description: Get information about physical computer profiles in SCVMM.
+        name: scvmm_physical_computer_profile_info
+        namespace: ''
+      - description: Manage PXE servers in System Center Virtual Machine Manager.
+        name: scvmm_pxe_server
+        namespace: ''
+      - description: Query PXE servers in System Center Virtual Machine Manager.
+        name: scvmm_pxe_server_info
+        namespace: ''
+      - description: Manage scripts in the SCVMM library.
+        name: scvmm_script
+        namespace: ''
+      - description: Query scripts in the SCVMM library.
+        name: scvmm_script_info
+        namespace: ''
+      - description: Manage servicing windows in System Center Virtual Machine Manager.
+        name: scvmm_servicing_window
+        namespace: ''
+      - description: Query servicing windows in System Center Virtual Machine Manager.
+        name: scvmm_servicing_window_info
+        namespace: ''
+      - description: Manage WSUS update servers in System Center Virtual Machine Manager.
+        name: scvmm_update_server
+        namespace: ''
+      - description: Query WSUS update servers in System Center Virtual Machine Manager.
+        name: scvmm_update_server_info
+        namespace: ''
+    release_date: '2026-08-10'

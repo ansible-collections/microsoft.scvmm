@@ -4,6 +4,43 @@ Microsoft SCVMM Collection Release Notes
 
 .. contents:: Topics
 
+v1.1.0
+======
+
+Release Summary
+---------------
+
+Added new modules for bare metal provisioning, inventory, jobs, servicing windows, custom properties, and library management.
+
+New Modules
+-----------
+
+- microsoft.scvmm.scvmm_baseline - Manage update baselines in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_baseline_info - Query update baselines in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_compliance_info - Query compliance status of managed computers in SCVMM.
+- microsoft.scvmm.scvmm_compliance_scan - Start a compliance scan on a managed computer in SCVMM.
+- microsoft.scvmm.scvmm_custom_property - Manage custom properties in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_custom_property_info - Query custom properties in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_custom_resource - Manage custom resources in the SCVMM library.
+- microsoft.scvmm.scvmm_custom_resource_info - Query custom resources in the SCVMM library.
+- microsoft.scvmm.scvmm_inventory_info - Retrieve SCVMM managed infrastructure inventory.
+- microsoft.scvmm.scvmm_iso - Manage ISO images in the SCVMM library.
+- microsoft.scvmm.scvmm_iso_info - Query ISO images in the SCVMM library.
+- microsoft.scvmm.scvmm_job - Manage SCVMM job state.
+- microsoft.scvmm.scvmm_job_info - Query jobs in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_library_share - Manage library shares in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_library_share_info - Query library shares in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_physical_computer_profile - Manage physical computer profiles in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_physical_computer_profile_info - Get information about physical computer profiles in SCVMM.
+- microsoft.scvmm.scvmm_pxe_server - Manage PXE servers in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_pxe_server_info - Query PXE servers in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_script - Manage scripts in the SCVMM library.
+- microsoft.scvmm.scvmm_script_info - Query scripts in the SCVMM library.
+- microsoft.scvmm.scvmm_servicing_window - Manage servicing windows in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_servicing_window_info - Query servicing windows in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_update_server - Manage WSUS update servers in System Center Virtual Machine Manager.
+- microsoft.scvmm.scvmm_update_server_info - Query WSUS update servers in System Center Virtual Machine Manager.
+
 v1.0.1
 ======
 
