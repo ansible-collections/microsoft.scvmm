@@ -1,3 +1,0 @@
-minor_changes:
-  - scvmm_job - new module to stop or restart SCVMM jobs.
-  - scvmm_job_info - new module to query SCVMM jobs.
