@@ -2,10 +2,50 @@
 
 **Topics**
 
+- <a href="#v1-1-0">v1\.1\.0</a>
+    - <a href="#release-summary">Release Summary</a>
+    - <a href="#new-modules">New Modules</a>
 - <a href="#v1-0-1">v1\.0\.1</a>
 - <a href="#v1-0-0">v1\.0\.0</a>
     - <a href="#minor-changes">Minor Changes</a>
-    - <a href="#new-modules">New Modules</a>
+    - <a href="#new-modules-1">New Modules</a>
+
+<a id="v1-1-0"></a>
+## v1\.1\.0
+
+<a id="release-summary"></a>
+### Release Summary
+
+Added new modules for bare metal provisioning\, inventory\, jobs\, servicing windows\, custom properties\, and library management\.
+
+<a id="new-modules"></a>
+### New Modules
+
+* microsoft\.scvmm\.scvmm\_baseline \- Manage update baselines in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_baseline\_info \- Query update baselines in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_compliance\_info \- Query compliance status of managed computers in SCVMM\.
+* microsoft\.scvmm\.scvmm\_compliance\_scan \- Start a compliance scan on a managed computer in SCVMM\.
+* microsoft\.scvmm\.scvmm\_custom\_property \- Manage custom properties in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_custom\_property\_info \- Query custom properties in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_custom\_resource \- Manage custom resources in the SCVMM library\.
+* microsoft\.scvmm\.scvmm\_custom\_resource\_info \- Query custom resources in the SCVMM library\.
+* microsoft\.scvmm\.scvmm\_inventory\_info \- Retrieve SCVMM managed infrastructure inventory\.
+* microsoft\.scvmm\.scvmm\_iso \- Manage ISO images in the SCVMM library\.
+* microsoft\.scvmm\.scvmm\_iso\_info \- Query ISO images in the SCVMM library\.
+* microsoft\.scvmm\.scvmm\_job \- Manage SCVMM job state\.
+* microsoft\.scvmm\.scvmm\_job\_info \- Query jobs in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_library\_share \- Manage library shares in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_library\_share\_info \- Query library shares in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_physical\_computer\_profile \- Manage physical computer profiles in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_physical\_computer\_profile\_info \- Get information about physical computer profiles in SCVMM\.
+* microsoft\.scvmm\.scvmm\_pxe\_server \- Manage PXE servers in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_pxe\_server\_info \- Query PXE servers in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_script \- Manage scripts in the SCVMM library\.
+* microsoft\.scvmm\.scvmm\_script\_info \- Query scripts in the SCVMM library\.
+* microsoft\.scvmm\.scvmm\_servicing\_window \- Manage servicing windows in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_servicing\_window\_info \- Query servicing windows in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_update\_server \- Manage WSUS update servers in System Center Virtual Machine Manager\.
+* microsoft\.scvmm\.scvmm\_update\_server\_info \- Query WSUS update servers in System Center Virtual Machine Manager\.
 
 <a id="v1-0-1"></a>
 ## v1\.0\.1
@@ -18,7 +58,7 @@
 
 * scvmm\_vm \- Manage the creation\, update\, and removal of Virtual Machines on SCVMM 2022\.
 
-<a id="new-modules"></a>
+<a id="new-modules-1"></a>
 ### New Modules
 
 * microsoft\.scvmm\.scvmm\_application\_profile \- Manage application profiles in System Center Virtual Machine Manager\.
