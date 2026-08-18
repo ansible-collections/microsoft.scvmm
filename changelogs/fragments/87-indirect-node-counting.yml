@@ -1,0 +1,2 @@
+minor_changes:
+  - Add indirect node counting event query for infrastructure resource tracking across 5 taxonomy buckets (https://github.com/ansible-collections/microsoft.scvmm/pull/87).

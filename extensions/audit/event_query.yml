@@ -34,21 +34,6 @@ microsoft.scvmm.scvmm_vm_info:
         platform: "scvmm"
       }
     }
-microsoft.scvmm.scvmm_vm_state:
-  query: >-
-    . | select(.state != null) | {
-      name: ("scvmm_vm_state:" + (.state | tostring)),
-      canonical_facts: {
-        module: "scvmm_vm_state",
-        id: .state
-      },
-      facts: {
-        infra_type: "private_cloud",
-        infra_bucket: "compute",
-        device_type: "virtual_machine",
-        platform: "scvmm"
-      }
-    }
 microsoft.scvmm.scvmm_vm_clone:
   query: >-
     .vm | select(. != null) | {
@@ -56,21 +41,6 @@ microsoft.scvmm.scvmm_vm_clone:
       canonical_facts: {
         module: "scvmm_vm_clone",
         id: .id
-      },
-      facts: {
-        infra_type: "private_cloud",
-        infra_bucket: "compute",
-        device_type: "virtual_machine",
-        platform: "scvmm"
-      }
-    }
-microsoft.scvmm.scvmm_vm_migrate:
-  query: >-
-    . | select(.destination_host != null) | {
-      name: ("scvmm_vm_migrate:" + (.destination_host | tostring)),
-      canonical_facts: {
-        module: "scvmm_vm_migrate",
-        id: .destination_host
       },
       facts: {
         infra_type: "private_cloud",
@@ -175,7 +145,7 @@ microsoft.scvmm.scvmm_host_info:
 # --- Compute: Host Clusters ---
 microsoft.scvmm.scvmm_host_cluster:
   query: >-
-    .host_cluster | select(. != null) | {
+    .cluster | select(. != null) | {
       name: ("scvmm_host_cluster:" + (.name | tostring)),
       canonical_facts: {
         module: "scvmm_host_cluster",
@@ -400,7 +370,7 @@ microsoft.scvmm.scvmm_ip_pool_info:
 microsoft.scvmm.scvmm_load_balancer:
   query: >-
     .load_balancer | select(. != null) | {
-      name: ("scvmm_load_balancer:" + (.name | tostring)),
+      name: ("scvmm_load_balancer:" + (.address | tostring)),
       canonical_facts: {
         module: "scvmm_load_balancer",
         id: .id
@@ -415,7 +385,7 @@ microsoft.scvmm.scvmm_load_balancer:
 microsoft.scvmm.scvmm_load_balancer_info:
   query: >-
     .load_balancers[] | {
-      name: ("scvmm_load_balancer_info:" + (.name | tostring)),
+      name: ("scvmm_load_balancer_info:" + (.address | tostring)),
       canonical_facts: {
         module: "scvmm_load_balancer_info",
         id: .id
