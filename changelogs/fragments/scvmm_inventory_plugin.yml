@@ -1,0 +1,11 @@
+minor_changes:
+  - >-
+    scvmm_inventory - new dynamic inventory plugin that discovers SCVMM managed
+    virtual machines and Hyper-V hosts over PSRP and exposes them with metadata
+    and network details as host variables. Virtual machines and hosts are grouped
+    into the ``virtual_machines`` and ``hyperv_hosts`` groups and tagged with a
+    ``scvmm_object_type`` variable; inclusion of each is controlled by the
+    ``include_vms`` and ``include_hosts`` options. Duplicate SCVMM object names
+    are disambiguated with a short ID suffix (with a warning) so no host is
+    silently dropped
+    (https://github.com/ansible-collections/microsoft.scvmm/pull/88).

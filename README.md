@@ -177,6 +177,67 @@ This collection uses the `winrm` or `psrp` connection plugins to communicate wit
 - `scvmm_user_role_quota` - Manage user role quotas
 - `scvmm_user_role_quota_info` - Query user role quotas
 
+## Inventory Plugins
+
+- `scvmm_inventory` - Dynamic inventory sourced from an SCVMM management server
+
+Unlike the modules (which run PowerShell on the target over WinRM/PSRP), the
+`scvmm_inventory` plugin runs on the **Ansible controller**. It connects to the
+SCVMM server with [pypsrp](https://github.com/jborean93/pypsrp), queries the
+virtual machines and SCVMM-managed Hyper-V hosts, and turns each one into an
+Ansible host with `scvmm_*` host variables. It supports `constructed` grouping
+(`keyed_groups`, `groups`, `compose`) and inventory caching.
+
+Every discovered object carries a `scvmm_object_type` variable (`vm` or
+`host`). Virtual machines are placed in the `virtual_machines` group and
+Hyper-V hosts in the `hyperv_hosts` group. Use `include_vms: false` or
+`include_hosts: false` to restrict discovery to one kind. Because SCVMM object
+names are not guaranteed to be unique, colliding names are disambiguated with a
+short object-ID suffix (and a warning) so no host is ever silently dropped; the
+original name is always available in `scvmm_name`.
+
+### Requirements
+
+- `pypsrp` on the controller (`pip install pypsrp`)
+- For Kerberos authentication, install the GSSAPI extra and the system Kerberos
+  libraries: `pip install pypsrp[kerberos]` plus the platform packages listed in
+  `bindep.txt` (e.g. `krb5-devel`/`krb5-workstation` on RHEL, `libkrb5-dev`/
+  `krb5-user` on Debian/Ubuntu). In an Execution Environment, `ansible-builder`
+  resolves these from `bindep.txt` for the chosen base image.
+
+### Supported authentication
+
+The `auth` option accepts `negotiate` (default), `kerberos`, `ntlm`, `credssp`,
+`basic`, and `certificate`. `negotiate` requires no extra binary dependencies,
+which keeps the default install and EE footprint minimal; `kerberos` is the most
+robust for domain environments but pulls in the GSSAPI dependencies above.
+
+### Example configuration
+
+Create a file ending in `scvmm.yml` (or `scvmm_inventory.yml`):
+
+```yaml
+# demo.scvmm.yml
+plugin: microsoft.scvmm.scvmm_inventory
+vmm_server: vmm.example.com
+# username/password/auth may also come from SCVMM_USERNAME / SCVMM_PASSWORD /
+# SCVMM_AUTH environment variables instead of being written here.
+auth: kerberos
+keyed_groups:
+  - key: scvmm_status
+    prefix: status
+  - key: scvmm_cloud
+    prefix: cloud
+compose:
+  ansible_host: scvmm_ipv4_addresses[0] | default(omit)
+```
+
+Then use it like any inventory:
+
+```bash
+ansible-inventory -i demo.scvmm.yml --graph
+```
+
 ## Support
 
 As Red Hat Ansible Certified Content, this collection is entitled to support through the Ansible Automation Platform (AAP).

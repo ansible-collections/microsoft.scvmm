@@ -1,0 +1,26 @@
+---
+# Seed a deterministic fixture VM on the SCVMM host so the inventory plugin has
+# a known host to discover. Runs on the SCVMM Windows host over WinRM.
+- name: Seed SCVMM inventory fixture
+  hosts: windows
+  gather_facts: false
+  tasks:
+    - name: Create fixture VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ fixture_vm }}"
+        template: "{{ test_vm_template }}"
+        vm_host: "{{ test_vm_host }}"
+        vmm_server: "{{ scvmm_server }}"
+        state: present
+
+    - name: Confirm fixture VM exists
+      microsoft.scvmm.scvmm_vm_info:
+        name: "{{ fixture_vm }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: seeded
+
+    - name: Assert fixture VM created
+      ansible.builtin.assert:
+        that:
+          - seeded.virtual_machines | length == 1
+          - seeded.virtual_machines[0].name == fixture_vm
