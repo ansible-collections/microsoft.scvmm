@@ -1,0 +1,768 @@
+---
+# Indirect Node Counting query for microsoft.scvmm collection
+# SCVMM is a private cloud hypervisor manager (Hyper-V)
+# Taxonomy: infra_type=private_cloud, platform=scvmm
+#
+# Excluded modules (not top-level managed infrastructure resources):
+#   Operational/action:  scvmm_vm_state, scvmm_vm_migrate, scvmm_compliance_scan
+#   Sub-components:      scvmm_vm_disk(_info), scvmm_vm_nic, scvmm_vm_dvd_drive,
+#                        scvmm_vm_scsi_adapter, scvmm_network_adapter(_info),
+#                        scvmm_host_network_adapter(_info)
+#   Configuration:       scvmm_hardware_profile(_info), scvmm_guest_os_profile(_info),
+#                        scvmm_application_profile(_info), scvmm_capability_profile(_info),
+#                        scvmm_sql_profile(_info), scvmm_custom_property(_info),
+#                        scvmm_custom_resource(_info), scvmm_service_template(_info)
+#   Plumbing:            scvmm_port_classification(_info), scvmm_uplink_port_profile(_info),
+#                        scvmm_logical_network_definition(_info)
+#   Operational utility: scvmm_job(_info), scvmm_script(_info), scvmm_compliance(_info),
+#                        scvmm_baseline(_info), scvmm_update_server, scvmm_servicing_window(_info)
+#   Ratings/inventory:   scvmm_host_rating_info, scvmm_inventory_info
+#   Cloud capacity:      scvmm_cloud_capacity(_info) — sub-metric of scvmm_cloud
+#   Storage metadata:    scvmm_storage_file_share_info — read-only sub-metric of storage_pool
+
+# --- Compute: Virtual Machines ---
+microsoft.scvmm.scvmm_vm:
+  query: >-
+    .vm | select(. != null) | {
+      name: ("scvmm_vm:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "virtual_machine",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_vm_info:
+  query: >-
+    .virtual_machines[] | {
+      name: ("scvmm_vm_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "virtual_machine",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_vm_clone:
+  query: >-
+    .vm | select(. != null) | {
+      name: ("scvmm_vm_clone:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_clone",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "virtual_machine",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_vm_checkpoint:
+  query: >-
+    .checkpoint | select(. != null) | {
+      name: ("scvmm_vm_checkpoint:" + (.id | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_checkpoint",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "virtual_machine",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_vm_checkpoint_info:
+  query: >-
+    .checkpoints[] | {
+      name: ("scvmm_vm_checkpoint_info:" + (.id | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_checkpoint_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "virtual_machine",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_template:
+  query: >-
+    .template | select(. != null) | {
+      name: ("scvmm_template:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_template",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "virtual_machine_template",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_template_info:
+  query: >-
+    .templates[] | {
+      name: ("scvmm_template_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_template_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "virtual_machine_template",
+        platform: "scvmm"
+      }
+    }
+
+# --- Compute: Hypervisor Hosts ---
+microsoft.scvmm.scvmm_host:
+  query: >-
+    .host | select(. != null) | {
+      name: ("scvmm_host:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_host",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "hypervisor_host",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_host_info:
+  query: >-
+    .hosts[] | {
+      name: ("scvmm_host_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_host_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "hypervisor_host",
+        platform: "scvmm"
+      }
+    }
+
+# --- Compute: Host Clusters ---
+microsoft.scvmm.scvmm_host_cluster:
+  query: >-
+    .cluster | select(. != null) | {
+      name: ("scvmm_host_cluster:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_host_cluster",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "compute_cluster",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_host_cluster_info:
+  query: >-
+    .host_clusters[] | {
+      name: ("scvmm_host_cluster_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_host_cluster_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "compute_cluster",
+        platform: "scvmm"
+      }
+    }
+
+# --- Compute: Clouds ---
+microsoft.scvmm.scvmm_cloud:
+  query: >-
+    .cloud | select(. != null) | {
+      name: ("scvmm_cloud:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_cloud",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "resource_group",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_cloud_info:
+  query: >-
+    .clouds[] | {
+      name: ("scvmm_cloud_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_cloud_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "compute",
+        device_type: "resource_group",
+        platform: "scvmm"
+      }
+    }
+
+# --- Networking: Logical Networks ---
+microsoft.scvmm.scvmm_logical_network:
+  query: >-
+    .logical_network | select(. != null) | {
+      name: ("scvmm_logical_network:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_logical_network",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "vpc",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_logical_network_info:
+  query: >-
+    .logical_networks[] | {
+      name: ("scvmm_logical_network_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_logical_network_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "vpc",
+        platform: "scvmm"
+      }
+    }
+
+# --- Networking: VM Networks ---
+microsoft.scvmm.scvmm_vm_network:
+  query: >-
+    .vm_network | select(. != null) | {
+      name: ("scvmm_vm_network:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_network",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "vpc",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_vm_network_info:
+  query: >-
+    .vm_networks[] | {
+      name: ("scvmm_vm_network_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_network_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "vpc",
+        platform: "scvmm"
+      }
+    }
+
+# --- Networking: VM Subnets ---
+microsoft.scvmm.scvmm_vm_subnet:
+  query: >-
+    .vm_subnet | select(. != null) | {
+      name: ("scvmm_vm_subnet:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_subnet",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "subnet",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_vm_subnet_info:
+  query: >-
+    .vm_subnets[] | {
+      name: ("scvmm_vm_subnet_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_vm_subnet_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "subnet",
+        platform: "scvmm"
+      }
+    }
+
+# --- Networking: Logical Switches ---
+microsoft.scvmm.scvmm_logical_switch:
+  query: >-
+    .logical_switch | select(. != null) | {
+      name: ("scvmm_logical_switch:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_logical_switch",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "switch",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_logical_switch_info:
+  query: >-
+    .logical_switches[] | {
+      name: ("scvmm_logical_switch_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_logical_switch_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "switch",
+        platform: "scvmm"
+      }
+    }
+
+# --- Networking: IP Pools ---
+microsoft.scvmm.scvmm_ip_pool:
+  query: >-
+    .ip_pool | select(. != null) | {
+      name: ("scvmm_ip_pool:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_ip_pool",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "ip_pool",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_ip_pool_info:
+  query: >-
+    .ip_pools[] | {
+      name: ("scvmm_ip_pool_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_ip_pool_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "ip_pool",
+        platform: "scvmm"
+      }
+    }
+
+# --- Networking: MAC Address Pools ---
+microsoft.scvmm.scvmm_mac_address_pool:
+  query: >-
+    .mac_address_pool | select(. != null) | {
+      name: ("scvmm_mac_address_pool:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_mac_address_pool",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "mac_address_pool",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_mac_address_pool_info:
+  query: >-
+    .mac_address_pools[] | {
+      name: ("scvmm_mac_address_pool_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_mac_address_pool_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "mac_address_pool",
+        platform: "scvmm"
+      }
+    }
+
+# --- Networking: Load Balancers ---
+microsoft.scvmm.scvmm_load_balancer:
+  query: >-
+    .load_balancer | select(. != null) | {
+      name: ("scvmm_load_balancer:" + (.address | tostring)),
+      canonical_facts: {
+        module: "scvmm_load_balancer",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "load_balancer",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_load_balancer_info:
+  query: >-
+    .load_balancers[] | {
+      name: ("scvmm_load_balancer_info:" + (.address | tostring)),
+      canonical_facts: {
+        module: "scvmm_load_balancer_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "networking",
+        device_type: "load_balancer",
+        platform: "scvmm"
+      }
+    }
+
+# --- Storage: Storage Providers ---
+microsoft.scvmm.scvmm_storage_provider:
+  query: >-
+    .storage_provider | select(. != null) | {
+      name: ("scvmm_storage_provider:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_storage_provider",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "storage_provider",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_storage_provider_info:
+  query: >-
+    .storage_providers[] | {
+      name: ("scvmm_storage_provider_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_storage_provider_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "storage_provider",
+        platform: "scvmm"
+      }
+    }
+
+# --- Storage: Storage Classifications ---
+microsoft.scvmm.scvmm_storage_classification:
+  query: >-
+    .storage_classification | select(. != null) | {
+      name: ("scvmm_storage_classification:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_storage_classification",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "storage_classification",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_storage_classification_info:
+  query: >-
+    .storage_classifications[] | {
+      name: ("scvmm_storage_classification_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_storage_classification_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "storage_classification",
+        platform: "scvmm"
+      }
+    }
+
+# --- Storage: Virtual Hard Disks ---
+microsoft.scvmm.scvmm_virtual_hard_disk:
+  query: >-
+    .virtual_hard_disk | select(. != null) | {
+      name: ("scvmm_virtual_hard_disk:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_virtual_hard_disk",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "block_storage",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_virtual_hard_disk_info:
+  query: >-
+    .virtual_hard_disks[] | {
+      name: ("scvmm_virtual_hard_disk_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_virtual_hard_disk_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "block_storage",
+        platform: "scvmm"
+      }
+    }
+
+# --- Storage: Storage Pools ---
+microsoft.scvmm.scvmm_storage_pool:
+  query: >-
+    .storage_pool | select(. != null) | {
+      name: ("scvmm_storage_pool:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_storage_pool",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "block_storage",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_storage_pool_info:
+  query: >-
+    .storage_pools[] | {
+      name: ("scvmm_storage_pool_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_storage_pool_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "block_storage",
+        platform: "scvmm"
+      }
+    }
+
+# --- Storage: Library Shares ---
+microsoft.scvmm.scvmm_library_share:
+  query: >-
+    .library_share | select(. != null) | {
+      name: ("scvmm_library_share:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_library_share",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "file_storage",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_library_share_info:
+  query: >-
+    .library_shares[] | {
+      name: ("scvmm_library_share_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_library_share_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "file_storage",
+        platform: "scvmm"
+      }
+    }
+
+# --- Storage: ISO Images ---
+microsoft.scvmm.scvmm_iso:
+  query: >-
+    .iso | select(. != null) | {
+      name: ("scvmm_iso:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_iso",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "media",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_iso_info:
+  query: >-
+    .isos[] | {
+      name: ("scvmm_iso_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_iso_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "storage",
+        device_type: "media",
+        platform: "scvmm"
+      }
+    }
+
+# --- Governance: Host Groups ---
+microsoft.scvmm.scvmm_host_group:
+  query: >-
+    .host_group | select(. != null) | {
+      name: ("scvmm_host_group:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_host_group",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "governance_ops",
+        device_type: "resource_group",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_host_group_info:
+  query: >-
+    .host_groups[] | {
+      name: ("scvmm_host_group_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_host_group_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "governance_ops",
+        device_type: "resource_group",
+        platform: "scvmm"
+      }
+    }
+
+# --- Governance: User Roles ---
+microsoft.scvmm.scvmm_user_role:
+  query: >-
+    .user_role | select(. != null) | {
+      name: ("scvmm_user_role:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_user_role",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "security_identity",
+        device_type: "iam",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_user_role_info:
+  query: >-
+    .user_roles[] | {
+      name: ("scvmm_user_role_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_user_role_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "security_identity",
+        device_type: "iam",
+        platform: "scvmm"
+      }
+    }
+
+# --- Security: Run As Accounts ---
+microsoft.scvmm.scvmm_run_as_account:
+  query: >-
+    .run_as_account | select(. != null) | {
+      name: ("scvmm_run_as_account:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_run_as_account",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "security_identity",
+        device_type: "iam",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_run_as_account_info:
+  query: >-
+    .run_as_accounts[] | {
+      name: ("scvmm_run_as_account_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_run_as_account_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "security_identity",
+        device_type: "iam",
+        platform: "scvmm"
+      }
+    }
+
+# --- Governance: Services ---
+microsoft.scvmm.scvmm_service:
+  query: >-
+    .service | select(. != null) | {
+      name: ("scvmm_service:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_service",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "governance_ops",
+        device_type: "deployment",
+        platform: "scvmm"
+      }
+    }
+microsoft.scvmm.scvmm_service_info:
+  query: >-
+    .services[] | {
+      name: ("scvmm_service_info:" + (.name | tostring)),
+      canonical_facts: {
+        module: "scvmm_service_info",
+        id: .id
+      },
+      facts: {
+        infra_type: "private_cloud",
+        infra_bucket: "governance_ops",
+        device_type: "deployment",
+        platform: "scvmm"
+      }
+    }
