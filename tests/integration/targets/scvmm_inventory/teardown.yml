@@ -1,0 +1,23 @@
+---
+# Remove the fixture VM. Runs on the SCVMM Windows host over WinRM.
+- name: Teardown SCVMM inventory fixture
+  hosts: windows
+  gather_facts: false
+  tasks:
+    - name: Remove fixture VM
+      microsoft.scvmm.scvmm_vm:
+        name: "{{ fixture_vm }}"
+        state: absent
+        vmm_server: "{{ scvmm_server }}"
+
+    - name: Confirm fixture VM is gone
+      microsoft.scvmm.scvmm_vm_info:
+        name: "{{ fixture_vm }}"
+        vmm_server: "{{ scvmm_server }}"
+      register: remaining
+
+    - name: Assert host is clean
+      ansible.builtin.assert:
+        that:
+          - remaining.virtual_machines | length == 0
+        fail_msg: "Fixture VM '{{ fixture_vm }}' still present after teardown."

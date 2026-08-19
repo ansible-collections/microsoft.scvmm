@@ -1,0 +1,13 @@
+unsupported
+# Controller-side integration test for the scvmm_inventory dynamic inventory plugin.
+# Marked "unsupported" so it is skipped by default CI (like the windows-group
+# module targets): it needs a live SCVMM environment that generic CI cannot
+# provide. Run it explicitly with:
+#   ansible-test integration scvmm_inventory --allow-unsupported
+# Unlike the module targets (which run on the SCVMM host via windows-integration),
+# this runs on the controller and reaches SCVMM over PSRP, so it needs:
+#   - pypsrp installed on the controller (pip install pypsrp)
+#   - network access to the SCVMM server
+#   - env: SCVMM_SERVER, SCVMM_USERNAME, SCVMM_PASSWORD, SCVMM_AUTH
+#   - env: SCVMM_WINRM_INVENTORY (winrm inventory used to seed/teardown the fixture VM)
+#   - env: SCVMM_VM_HOST, SCVMM_VM_TEMPLATE (fixture VM placement)

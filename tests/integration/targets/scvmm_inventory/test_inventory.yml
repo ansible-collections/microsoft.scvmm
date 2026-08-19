@@ -1,0 +1,57 @@
+---
+# Assert the scvmm_inventory plugin discovered the fixture VM correctly.
+# Runs with -i test.scvmm.yml, so the plugin has already populated inventory.
+- name: Verify scvmm_inventory plugin output
+  hosts: localhost
+  connection: local
+  gather_facts: false
+  vars:
+    fixture_vm: "{{ lookup('env', 'SCVMM_FIXTURE_VM') }}"
+  tasks:
+    - name: Show discovered hosts
+      ansible.builtin.debug:
+        var: groups
+
+    - name: Assert fixture VM was discovered
+      ansible.builtin.assert:
+        that:
+          - fixture_vm in groups['all']
+        fail_msg: "Fixture VM '{{ fixture_vm }}' was not discovered by the plugin."
+
+    - name: Assert fixture VM has scvmm_ host variables
+      ansible.builtin.assert:
+        that:
+          - hostvars[fixture_vm].scvmm_name == fixture_vm
+          - hostvars[fixture_vm].scvmm_status is defined
+          - hostvars[fixture_vm].scvmm_id is defined
+
+    - name: Assert fixture VM landed in a status keyed group
+      ansible.builtin.assert:
+        that:
+          - hostvars[fixture_vm].group_names | select('match', '^status_') | list | length > 0
+        fail_msg: "Fixture VM was not placed in any status_* keyed group."
+
+    - name: Assert fixture VM is typed and grouped as a VM
+      ansible.builtin.assert:
+        that:
+          - hostvars[fixture_vm].scvmm_object_type == 'vm'
+          - "'virtual_machines' in groups"
+          - fixture_vm in groups['virtual_machines']
+
+    - name: Assert Hyper-V hosts were discovered
+      ansible.builtin.assert:
+        that:
+          - "'hyperv_hosts' in groups"
+          - groups['hyperv_hosts'] | length > 0
+        fail_msg: "No SCVMM-managed Hyper-V hosts were discovered."
+
+    - name: Assert discovered hosts are typed as host
+      ansible.builtin.assert:
+        that:
+          - hostvars[groups['hyperv_hosts'][0]].scvmm_object_type == 'host'
+          - hostvars[groups['hyperv_hosts'][0]].scvmm_state is defined
+
+    - name: Assert non-existent host is absent (negative case)
+      ansible.builtin.assert:
+        that:
+          - "'ThisVmDoesNotExist_scvmm' not in groups['all']"

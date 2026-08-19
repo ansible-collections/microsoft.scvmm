@@ -1,0 +1,8 @@
+# Non-Python (system) dependencies, resolved per base image by ansible-builder.
+# Only needed for Kerberos authentication with the scvmm_inventory plugin
+# (pypsrp[kerberos] -> python-gssapi -> krb5). Package names vary across
+# RHEL/UBI versions; bindep selects the right ones for the target platform.
+krb5-devel [platform:rpm compile]
+krb5-workstation [platform:rpm]
+libkrb5-dev [platform:dpkg compile]
+krb5-user [platform:dpkg]

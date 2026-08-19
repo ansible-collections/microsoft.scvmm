@@ -1,0 +1,4 @@
+# Controller-side Python requirements for microsoft.scvmm.
+# Required by the scvmm_inventory dynamic inventory plugin (PSRP transport).
+# For Kerberos authentication install the extra: pip install pypsrp[kerberos]
+pypsrp

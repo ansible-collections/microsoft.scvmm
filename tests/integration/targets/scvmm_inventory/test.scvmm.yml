@@ -1,0 +1,15 @@
+# scvmm_inventory config used by the integration test.
+# Connection details (vmm_server, username, password, auth) come from the
+# environment (SCVMM_SERVER / SCVMM_USERNAME / SCVMM_PASSWORD / SCVMM_AUTH) via
+# the plugin's doc-fragment env fallbacks, so no secrets live in this file.
+plugin: microsoft.scvmm.scvmm_inventory
+validate_certs: false
+keyed_groups:
+  - key: scvmm_status
+    prefix: status
+    separator: _
+  - key: scvmm_cloud
+    prefix: cloud
+    separator: _
+compose:
+  ansible_host: scvmm_ipv4_addresses[0] | default(omit)
