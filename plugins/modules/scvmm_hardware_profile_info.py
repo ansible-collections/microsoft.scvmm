@@ -91,6 +91,10 @@ hardware_profiles:
       description: Whether highly available.
       type: bool
       returned: always
+    ha_vm_priority:
+      description: HA restart priority (3000 High, 2000 Medium, 1000 Low, 0 no auto-restart).
+      type: int
+      returned: always
     secure_boot_enabled:
       description: Whether secure boot is enabled.
       type: bool

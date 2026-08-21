@@ -26,7 +26,8 @@ $propertyMap = @(
     @{ Param = "dynamic_memory_minimum_mb"; Property = "DynamicMemoryMinimumMB"; Type = "int" }
     @{ Param = "dynamic_memory_maximum_mb"; Property = "DynamicMemoryMaximumMB"; Type = "int" }
     @{ Param = "generation"; Property = "Generation"; Type = "int" }
-    @{ Param = "highly_available"; Property = "HighlyAvailable"; Type = "bool" }
+    @{ Param = "highly_available"; Property = "IsHighlyAvailable"; Type = "bool" }
+    @{ Param = "ha_vm_priority"; Property = "HAVMPriority"; Type = "int" }
     @{ Param = "secure_boot_enabled"; Property = "SecureBootEnabled"; Type = "bool" }
     @{ Param = "checkpoint_type"; Property = "CheckpointType"; Type = "enum" }
     @{ Param = "cpu_expected_utilization_percent"; Property = "ExpectedCPUUtilization"; Type = "int" }

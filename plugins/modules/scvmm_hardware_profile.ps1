@@ -20,6 +20,7 @@ $spec = @{
         cpu_relative_weight = @{ type = 'int' }
         cpu_reserve = @{ type = 'int' }
         highly_available = @{ type = 'bool' }
+        ha_vm_priority = @{ type = 'int'; choices = @(0, 1000, 2000, 3000) }
         generation = @{ type = 'int'; choices = @(1, 2) }
         secure_boot_enabled = @{ type = 'bool' }
         checkpoint_type = @{ type = 'str'; choices = @('Disabled', 'Production', 'ProductionOnly', 'Standard') }
@@ -47,7 +48,8 @@ $propertyMap = @(
     @{ Param = "dynamic_memory_minimum_mb"; Property = "DynamicMemoryMinimumMB"; Type = "int" }
     @{ Param = "dynamic_memory_maximum_mb"; Property = "DynamicMemoryMaximumMB"; Type = "int" }
     @{ Param = "generation"; Property = "Generation"; Type = "int" }
-    @{ Param = "highly_available"; Property = "HighlyAvailable"; Type = "bool" }
+    @{ Param = "highly_available"; Property = "IsHighlyAvailable"; Type = "bool" }
+    @{ Param = "ha_vm_priority"; Property = "HAVMPriority"; Type = "int" }
     @{ Param = "secure_boot_enabled"; Property = "SecureBootEnabled"; Type = "bool" }
     @{ Param = "checkpoint_type"; Property = "CheckpointType"; Type = "enum" }
     @{ Param = "cpu_expected_utilization_percent"; Property = "ExpectedCPUUtilization"; Type = "int" }
@@ -67,7 +69,8 @@ $updateMap = @(
     @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
     @{ Param = "dynamic_memory_minimum_mb"; Property = "DynamicMemoryMinimumMB"; Type = "int" }
     @{ Param = "dynamic_memory_maximum_mb"; Property = "DynamicMemoryMaximumMB"; Type = "int" }
-    @{ Param = "highly_available"; Property = "HighlyAvailable"; Type = "bool" }
+    @{ Param = "highly_available"; Property = "IsHighlyAvailable"; Type = "bool"; CmdletParam = "HighlyAvailable" }
+    @{ Param = "ha_vm_priority"; Property = "HAVMPriority"; Type = "int" }
     @{ Param = "secure_boot_enabled"; Property = "SecureBootEnabled"; Type = "bool" }
     @{ Param = "checkpoint_type"; Property = "CheckpointType"; Type = "enum" }
     @{ Param = "cpu_expected_utilization_percent"; Property = "ExpectedCPUUtilization"; Type = "int"; CmdletParam = "CPUExpectedUtilizationPercent" }

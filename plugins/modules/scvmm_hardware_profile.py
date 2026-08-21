@@ -67,6 +67,12 @@ options:
     description:
       - Whether VMs using this profile should be highly available.
     type: bool
+  ha_vm_priority:
+    description:
+      - HA restart priority for VMs using this profile. Only effective when O(highly_available=true).
+      - Numeric values map to High (3000), Medium (2000), Low (1000); 0 disables automatic restart.
+    type: int
+    choices: [0, 1000, 2000, 3000]
   generation:
     description:
       - Virtual machine generation.
@@ -195,6 +201,11 @@ hardware_profile:
       type: bool
       returned: always
       sample: false
+    ha_vm_priority:
+      description: HA restart priority (3000 High, 2000 Medium, 1000 Low, 0 no auto-restart).
+      type: int
+      returned: always
+      sample: 2000
     secure_boot_enabled:
       description: Whether secure boot is enabled.
       type: bool
