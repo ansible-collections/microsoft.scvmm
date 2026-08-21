@@ -1,4 +1,0 @@
-bugfixes:
-  - scvmm_hardware_profile, scvmm_hardware_profile_info - fix ``highly_available`` always being reported as ``false`` by reading the correct ``IsHighlyAvailable`` object property.
-minor_changes:
-  - scvmm_hardware_profile, scvmm_hardware_profile_info - add ``ha_vm_priority`` option to set and report the highly available VM restart priority (High 3000, Medium 2000, Low 1000, 0 disables automatic restart).
