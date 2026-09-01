@@ -1,0 +1,12 @@
+bugfixes:
+  - >-
+    collection packaging - bundle the full GPL-3.0-or-later license text as a
+    ``COPYING`` file in the collection root so the license referenced by the
+    module/plugin headers (``see COPYING or ...``) and the README is
+    self-contained rather than only an external link
+    (https://github.com/ansible-collections/microsoft.scvmm/pull/94).
+  - >-
+    README - document the minimum Ansible controller requirements (ansible-core
+    ``>=2.16.0`` and Python 3.10 or later) in the requirements section so the
+    supported baseline is explicit
+    (https://github.com/ansible-collections/microsoft.scvmm/pull/94).

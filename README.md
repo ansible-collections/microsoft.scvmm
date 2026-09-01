@@ -70,6 +70,10 @@ This collection is tested with the most current Ansible releases.
 
 ## External requirements
 
+### Ansible Controller Requirements
+- **ansible-core**: 2.16.0 or later
+- **Python**: 3.10 or later (on the Ansible controller, as required by ansible-core 2.16)
+
 ### Platform Requirements
 - **Operating System**: Windows Server 2016 or later with SCVMM 2022 Management Server installed
 - **PowerShell**: PowerShell 5.1 or later
@@ -333,4 +337,4 @@ See the [changelog](https://github.com/ansible-collections/microsoft.scvmm/blob/
 
 GNU General Public License v3.0 or later.
 
-See [LICENSE](https://www.gnu.org/licenses/gpl-3.0.txt) to see the full text.
+See [COPYING](COPYING) to see the full text.
