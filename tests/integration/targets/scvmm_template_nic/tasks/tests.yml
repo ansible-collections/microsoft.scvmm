@@ -1,0 +1,107 @@
+---
+# --- Bind the template adapter to the VM network ---
+- name: Bind template adapter to VM network
+  microsoft.scvmm.scvmm_template_nic:
+    template_name: "{{ test_template }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: bind_result
+
+- name: Assert adapter bound to VM network
+  ansible.builtin.assert:
+    that:
+      - bind_result.changed == true
+      - bind_result.template_nic.template_name == test_template
+      - bind_result.template_nic.vm_network == test_vmnet_name
+      - bind_result.template_nic.id is defined
+      - bind_result.template_nic.is_synthetic is defined
+
+- name: Bind template adapter again (idempotency)
+  microsoft.scvmm.scvmm_template_nic:
+    template_name: "{{ test_template }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: bind_idem
+
+- name: Assert no change when already bound
+  ansible.builtin.assert:
+    that:
+      - bind_idem.changed == false
+      - bind_idem.template_nic.vm_network == test_vmnet_name
+
+# --- Check mode: would enable VLAN ---
+- name: Check mode - enable VLAN on template adapter
+  microsoft.scvmm.scvmm_template_nic:
+    template_name: "{{ test_template }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vlan_enabled: true
+    vlan_id: 100
+    vmm_server: "{{ scvmm_server }}"
+  check_mode: true
+  register: check_mode_vlan
+  diff: true
+
+- name: Assert check mode reports VLAN change
+  ansible.builtin.assert:
+    that:
+      - check_mode_vlan.changed == true
+      - check_mode_vlan.diff.after.vlan_enabled == true
+      - check_mode_vlan.diff.after.vlan_id == 100
+
+# --- Set a static MAC address ---
+- name: Set static MAC on template adapter
+  microsoft.scvmm.scvmm_template_nic:
+    template_name: "{{ test_template }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Static
+    mac_address: "00:1A:2B:3C:4D:5E"
+    vmm_server: "{{ scvmm_server }}"
+  register: mac_result
+
+- name: Assert static MAC applied
+  ansible.builtin.assert:
+    that:
+      - mac_result.changed == true
+      - mac_result.template_nic.mac_address_type == "Static"
+
+- name: Set static MAC again (idempotency)
+  microsoft.scvmm.scvmm_template_nic:
+    template_name: "{{ test_template }}"
+    vm_network: "{{ test_vmnet_name }}"
+    mac_address_type: Static
+    mac_address: "00:1A:2B:3C:4D:5E"
+    vmm_server: "{{ scvmm_server }}"
+  register: mac_idem
+
+- name: Assert no change when MAC already set
+  ansible.builtin.assert:
+    that:
+      - mac_idem.changed == false
+
+# --- Error: non-existent template ---
+- name: Configure NIC on non-existent template
+  microsoft.scvmm.scvmm_template_nic:
+    template_name: "NonExistentTemplate_{{ 99999 | random }}"
+    vm_network: "{{ test_vmnet_name }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: error_no_template
+  ignore_errors: true
+
+- name: Assert error for non-existent template
+  ansible.builtin.assert:
+    that:
+      - error_no_template.failed == true
+
+# --- Error: non-existent VM network ---
+- name: Bind template adapter to non-existent VM network
+  microsoft.scvmm.scvmm_template_nic:
+    template_name: "{{ test_template }}"
+    vm_network: "NonExistentNetwork_{{ 99999 | random }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: error_no_network
+  ignore_errors: true
+
+- name: Assert error for non-existent VM network
+  ansible.builtin.assert:
+    that:
+      - error_no_network.failed == true
