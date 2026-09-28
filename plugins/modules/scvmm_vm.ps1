@@ -21,6 +21,13 @@ $spec = @{
         hardware_profile = @{ type = 'str' }
         generation = @{ type = 'int'; choices = @(1, 2) }
         path = @{ type = 'str' }
+        run_once_commands = @{ type = 'list'; elements = 'str' }
+        computer_name = @{ type = 'str' }
+        start_action = @{ type = 'str'; choices = @('NeverAutoTurnOnVM', 'AlwaysAutoTurnOnVM', 'TurnOnVMIfRunningWhenVSStopped') }
+        stop_action = @{ type = 'str'; choices = @('SaveVM', 'TurnOffVM', 'ShutdownGuestOS') }
+    }
+    required_by = @{
+        run_once_commands = 'template'
     }
     supports_check_mode = $true
 }
@@ -41,6 +48,10 @@ $dynamicMemory = $module.Params.dynamic_memory
 $hardwareProfile = $module.Params.hardware_profile
 $generation = $module.Params.generation
 $path = $module.Params.path
+$runOnceCommands = $module.Params.run_once_commands
+$computerName = $module.Params.computer_name
+$startAction = $module.Params.start_action
+$stopAction = $module.Params.stop_action
 
 $propertyMap = @(
     @{ Param = "id"; Property = "ID"; Type = "id" }
@@ -52,6 +63,9 @@ $propertyMap = @(
     @{ Param = "generation"; Property = "Generation"; Type = "int" }
     @{ Param = "description"; Property = "Description"; Type = "string" }
     @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
+    @{ Param = "computer_name"; Property = "ComputerName"; Type = "string" }
+    @{ Param = "start_action"; Property = "StartAction"; Type = "enum" }
+    @{ Param = "stop_action"; Property = "StopAction"; Type = "enum" }
 )
 
 $updateMap = @(
@@ -59,6 +73,8 @@ $updateMap = @(
     @{ Param = "memory_mb"; Property = "Memory"; Type = "int"; CmdletParam = "MemoryMB" }
     @{ Param = "description"; Property = "Description"; Type = "string" }
     @{ Param = "dynamic_memory"; Property = "DynamicMemoryEnabled"; Type = "bool" }
+    @{ Param = "start_action"; Property = "StartAction"; Type = "enum" }
+    @{ Param = "stop_action"; Property = "StopAction"; Type = "enum" }
 )
 
 $vmmConnection = Connect-SCVMMServerSession -Module $module -VMMServer $vmmServer
@@ -153,6 +169,19 @@ else {
             $createParams.Generation = $generation
         }
 
+        if ($startAction) {
+            $createParams.StartAction = $startAction
+        }
+        if ($stopAction) {
+            $createParams.StopAction = $stopAction
+        }
+
+        # Guest computer name is only applied at specialization (create); it cannot be
+        # changed idempotently on an existing VM.
+        if ($computerName) {
+            $createParams.ComputerName = $computerName
+        }
+
         if ($path) {
             $createParams.Path = $path
         }
@@ -163,11 +192,57 @@ else {
             }
         }
 
+        # GUIRunOnce commands are injected via the guest OS customization pass, which SCVMM
+        # only performs when the template is customizable. Without it the commands are
+        # silently dropped, so fail loudly instead.
+        if ($runOnceCommands -and -not $templateObj.IsCustomizable) {
+            $module.FailJson("run_once_commands requires template '$template' to support guest OS customization (IsCustomizable), but it is not customizable.")
+        }
+
         $module.Diff.before = @{}
 
         if (-not $module.CheckMode) {
             try {
-                $vm = New-SCVirtualMachine @createParams -ErrorAction Stop -StartVM:$false
+                if ($runOnceCommands) {
+                    # -GuiRunOnceCommands is exposed only by the NewVmFromTemplate (needs
+                    # -VMHost + -Path) and NewVmFromVmConfig (-VMConfiguration) parameter sets of
+                    # New-SCVirtualMachine; it cannot be combined with a plain -VMTemplate + -Cloud
+                    # create. Build a VM configuration (NewVmFromVmConfig) so run-once works for
+                    # cloud and host placement alike. Template presence is enforced by required_by.
+                    $vmConfig = New-SCVMConfiguration -VMTemplate $templateObj -Name $name -ErrorAction Stop
+                    if ($createParams.Cloud) {
+                        Set-SCVMConfiguration -VMConfiguration $vmConfig -Cloud $createParams.Cloud | Out-Null
+                    }
+                    elseif ($createParams.VMHost) {
+                        Set-SCVMConfiguration -VMConfiguration $vmConfig -VMHost $createParams.VMHost | Out-Null
+                    }
+                    if ($computerName) {
+                        Set-SCVMConfiguration -VMConfiguration $vmConfig -ComputerName $computerName | Out-Null
+                    }
+                    Update-SCVMConfiguration -VMConfiguration $vmConfig | Out-Null
+
+                    $configCreate = @{
+                        Name = $name
+                        VMMServer = $vmmConnection
+                        VMConfiguration = $vmConfig
+                        GuiRunOnceCommands = $runOnceCommands
+                        ErrorAction = 'Stop'
+                    }
+                    if ($createParams.Cloud) { $configCreate.Cloud = $createParams.Cloud }
+                    if ($createParams.Description) { $configCreate.Description = $createParams.Description }
+                    if ($createParams.CPUCount) { $configCreate.CPUCount = $createParams.CPUCount }
+                    if ($createParams.MemoryMB) { $configCreate.MemoryMB = $createParams.MemoryMB }
+                    if ($null -ne $createParams.DynamicMemoryEnabled) {
+                        $configCreate.DynamicMemoryEnabled = $createParams.DynamicMemoryEnabled
+                    }
+                    if ($createParams.StartAction) { $configCreate.StartAction = $createParams.StartAction }
+                    if ($createParams.StopAction) { $configCreate.StopAction = $createParams.StopAction }
+
+                    $vm = New-SCVirtualMachine @configCreate -StartVM:$false
+                }
+                else {
+                    $vm = New-SCVirtualMachine @createParams -ErrorAction Stop -StartVM:$false
+                }
             }
             catch {
                 $module.FailJson("Failed to create VM: $($_.Exception.Message)")
@@ -192,6 +267,9 @@ else {
                 memory_mb = $memoryMb
                 generation = $generation
                 description = $description
+                computer_name = $computerName
+                start_action = $startAction
+                stop_action = $stopAction
             }
             $module.Diff.after = $module.Result.vm
         }

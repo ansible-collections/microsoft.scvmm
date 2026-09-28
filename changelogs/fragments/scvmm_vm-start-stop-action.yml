@@ -1,0 +1,2 @@
+minor_changes:
+  - scvmm_vm - add ``start_action`` and ``stop_action`` options to control the virtual machine's behavior when the host's virtualization service starts and stops. Both are applied on creation and updated in place on an existing VM.

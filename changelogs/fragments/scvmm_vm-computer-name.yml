@@ -1,0 +1,2 @@
+minor_changes:
+  - scvmm_vm - add ``computer_name`` option to set the guest operating system computer name during VM creation (applied at specialization; not changed in place on an existing VM).
