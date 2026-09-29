@@ -1,0 +1,2 @@
+minor_changes:
+  - scvmm_vm - add ``run_once_commands`` option to run guest first-boot commands during VM creation via the template's Sysprep ``GUIRunOnce`` customization.

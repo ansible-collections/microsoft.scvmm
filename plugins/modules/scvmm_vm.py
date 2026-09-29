@@ -87,6 +87,36 @@ options:
       - File system path on the host where VM files will be stored.
       - If not specified and O(vm_host) is used, the host's default VM path is used automatically.
     type: str
+  run_once_commands:
+    description:
+      - List of commands to run once during guest operating system specialization (Sysprep GUIRunOnce).
+      - Only used during VM creation.
+      - Requires the source template to be customizable (have a guest OS profile); the module fails otherwise.
+      - Commands run in the order provided when the guest first boots.
+    type: list
+    elements: str
+    version_added: "1.3.0"
+  computer_name:
+    description:
+      - Guest operating system computer (host) name to apply during specialization.
+      - Only used during VM creation; the guest name cannot be changed in place on an existing VM.
+      - When omitted, the template's guest OS profile decides the name (often a random Sysprep name).
+    type: str
+    version_added: "1.3.0"
+  start_action:
+    description:
+      - Action the virtual machine takes when the host's virtualization service starts.
+      - Applied on creation and updated in place on an existing VM when it differs.
+    type: str
+    choices: [ NeverAutoTurnOnVM, AlwaysAutoTurnOnVM, TurnOnVMIfRunningWhenVSStopped ]
+    version_added: "1.3.0"
+  stop_action:
+    description:
+      - Action the virtual machine takes when the host's virtualization service stops.
+      - Applied on creation and updated in place on an existing VM when it differs.
+    type: str
+    choices: [ SaveVM, TurnOffVM, ShutdownGuestOS ]
+    version_added: "1.3.0"
 author:
   - Ansible Ecosystem Engineering team (@eco-ansible-content)
 '''
@@ -127,6 +157,23 @@ EXAMPLES = r'''
     cloud: Production
     template: UbuntuTemplate
     hardware_profile: Standard_DS2_v2
+
+- name: Create VM and run first-boot commands
+  microsoft.scvmm.scvmm_vm:
+    name: TestVM03
+    state: present
+    cloud: Production
+    template: Windows2022Template
+    run_once_commands:
+      - 'powershell.exe -Command Enable-PSRemoting -Force'
+      - 'cmd.exe /c echo provisioned > C:\\provisioned.txt'
+
+- name: Set host start/stop actions on an existing VM
+  microsoft.scvmm.scvmm_vm:
+    name: TestVM01
+    state: present
+    start_action: NeverAutoTurnOnVM
+    stop_action: ShutdownGuestOS
 
 - name: Remove VM
   microsoft.scvmm.scvmm_vm:
@@ -183,4 +230,16 @@ vm:
       description: VM description.
       type: str
       sample: Test virtual machine
+    computer_name:
+      description: Guest operating system computer name.
+      type: str
+      sample: WEB01
+    start_action:
+      description: Action the VM takes when the host's virtualization service starts.
+      type: str
+      sample: NeverAutoTurnOnVM
+    stop_action:
+      description: Action the VM takes when the host's virtualization service stops.
+      type: str
+      sample: ShutdownGuestOS
 '''

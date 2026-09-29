@@ -89,3 +89,173 @@
   assert:
     that:
       - delete_idem.changed == false
+
+# --- run_once_commands (guest first-boot customization) ---
+- name: Check mode - create VM with run_once_commands
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    template: "{{ test_vm_template }}"
+    vm_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+    run_once_commands:
+      - "cmd.exe /c echo provisioned > C:\\provisioned.txt"
+  check_mode: true
+  register: runonce_check
+
+- name: Assert check mode reports changed and did not create the VM
+  assert:
+    that:
+      - runonce_check.changed == true
+
+- name: Verify check mode did not create the VM
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: runonce_check_info
+
+- name: Assert VM absent after check mode
+  assert:
+    that:
+      - runonce_check_info.virtual_machines | length == 0
+
+- name: Create VM with run_once_commands
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    template: "{{ test_vm_template }}"
+    vm_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+    run_once_commands:
+      - "cmd.exe /c echo provisioned > C:\\provisioned.txt"
+  register: runonce_create
+
+- name: Assert VM created with run_once_commands accepted
+  assert:
+    that:
+      - runonce_create.changed == true
+      - runonce_create.vm.name == test_vm
+
+- name: Delete run_once VM
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: runonce_delete
+
+- name: Assert run_once VM deleted
+  ansible.builtin.assert:
+    that:
+      - runonce_delete.changed == true
+
+# --- required_by: run_once_commands requires template (also in check mode) ---
+- name: run_once_commands without template must fail
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    vm_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+    run_once_commands:
+      - "cmd.exe /c echo hi"
+  check_mode: true
+  register: runonce_notemplate
+  ignore_errors: true
+
+- name: Assert required_by rejected the missing template
+  ansible.builtin.assert:
+    that:
+      - runonce_notemplate is failed
+      - "'template' in runonce_notemplate.msg"
+
+# --- start_action / stop_action / computer_name ---
+- name: Check mode - create VM with lifecycle/identity options
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    template: "{{ test_vm_template }}"
+    vm_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+    computer_name: ANSIBLETEST
+    start_action: NeverAutoTurnOnVM
+    stop_action: ShutdownGuestOS
+  check_mode: true
+  register: opts_check
+
+- name: Assert check mode previews the new options
+  ansible.builtin.assert:
+    that:
+      - opts_check.changed == true
+      - opts_check.vm.computer_name == 'ANSIBLETEST'
+      - opts_check.vm.start_action == 'NeverAutoTurnOnVM'
+      - opts_check.vm.stop_action == 'ShutdownGuestOS'
+
+- name: Verify check mode did not create the VM
+  microsoft.scvmm.scvmm_vm_info:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+  register: opts_check_info
+
+- name: Assert VM absent after check mode
+  ansible.builtin.assert:
+    that:
+      - opts_check_info.virtual_machines | length == 0
+
+- name: Create VM with start_action, stop_action, computer_name
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    template: "{{ test_vm_template }}"
+    vm_host: "{{ test_vm_host }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+    computer_name: ANSIBLETEST
+    start_action: NeverAutoTurnOnVM
+    stop_action: ShutdownGuestOS
+  register: opts_create
+
+- name: Assert VM created with the requested power actions
+  ansible.builtin.assert:
+    that:
+      - opts_create.changed == true
+      - opts_create.vm.computer_name == 'ANSIBLETEST'
+      - opts_create.vm.start_action == 'NeverAutoTurnOnVM'
+      - opts_create.vm.stop_action == 'ShutdownGuestOS'
+
+- name: Re-apply start_action/stop_action (idempotency)
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+    start_action: NeverAutoTurnOnVM
+    stop_action: ShutdownGuestOS
+  register: opts_idem
+
+- name: Assert no change on re-apply
+  ansible.builtin.assert:
+    that:
+      - opts_idem.changed == false
+
+- name: Update stop_action (idempotent update path)
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    vmm_server: "{{ scvmm_server }}"
+    state: present
+    stop_action: TurnOffVM
+  register: opts_update
+
+- name: Assert stop_action updated
+  ansible.builtin.assert:
+    that:
+      - opts_update.changed == true
+      - opts_update.vm.stop_action == 'TurnOffVM'
+
+- name: Delete options VM
+  microsoft.scvmm.scvmm_vm:
+    name: "{{ test_vm }}"
+    state: absent
+    vmm_server: "{{ scvmm_server }}"
+  register: opts_delete
+
+- name: Assert options VM deleted
+  ansible.builtin.assert:
+    that:
+      - opts_delete.changed == true
