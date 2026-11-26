@@ -1,0 +1,13 @@
+---
+name: Changelog fragment check
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+
+jobs:
+  changelog:
+    uses: ansible-network/github_actions/.github/workflows/changelog.yml@38b45197e14346c2e1b9d4bca048d0ff8c29a9b2
